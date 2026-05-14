@@ -1,0 +1,72 @@
+app:
+  name: "Source Code Audit System"
+  version: "1.0.0"
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+
+database:
+  type: "sqlite"
+  path: "./data/audit.db"
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+
+security:
+  secret_key: "your-secret-key-change-in-production-use-openssl-rand-base64-32"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  refresh_token_expire_days: 7
+  bcrypt_cost_factor: 12
+  max_login_attempts: 5
+  lockout_duration_minutes: 15
+
+monitor:
+  enabled: true
+  watch_paths:
+    - "/source"
+    - "D:/Projects/SourceCode"
+  exclude_paths:
+    - "*/.git/*"
+    - "*/node_modules/*"
+    - "*/__pycache__/*"
+    - "*/bin/*"
+    - "*/obj/*"
+  exclude_extensions:
+    - ".pyc"
+    - ".class"
+    - ".o"
+    - ".exe"
+  mode: "recursive"
+  capture_diff: true
+  diff_context_lines: 3
+  batch_size: 100
+  batch_timeout_seconds: 5
+
+rate_limit:
+  enabled: true
+  per_minute: 60
+
+log:
+  level: "INFO"
+  dir: "./logs/audit"
+  retention_days: 365
+  format: "json"
+  app_log_file: "app.log"
+  audit_log_prefix: "audit"
+
+file_access:
+  max_file_size_mb: 100
+  allowed_encodings:
+    - "utf-8"
+    - "gbk"
+    - "gb2312"
+  preview_lines: 1000
+
+admin:
+  default_username: "admin"
+  default_password: "Admin@123456"
+  must_change_password: true
