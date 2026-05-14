@@ -52,7 +52,7 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> AuditLog:
         session_id=event_data.get("session_id"),
         diff_content=event_data.get("diff_content"),
         error_message=event_data.get("error_message"),
-        event_metadata=event_data.get("event_metadata"),
+        extra_data=event_data.get("extra_data"),
         timestamp=datetime.utcnow()
     )
 
