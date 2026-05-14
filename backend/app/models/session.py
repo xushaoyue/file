@@ -8,6 +8,7 @@ class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(255), unique=True, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token_hash = Column(String(255), unique=True, index=True)
     refresh_token_hash = Column(String(255))
@@ -15,6 +16,7 @@ class Session(Base):
     refresh_expires_at = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
     last_activity = Column(DateTime)
+    revoked_at = Column(DateTime)
     is_active = Column(Boolean, default=True)
     ip_address = Column(String(50))
     user_agent = Column(Text)

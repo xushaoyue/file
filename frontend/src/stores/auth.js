@@ -11,18 +11,27 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username, password) {
     try {
+      console.log('开始登录，用户名:', username)
       const response = await apiLogin(username, password)
+      console.log('登录响应:', response)
+      
       token.value = response.data.access_token
       refreshTokenValue.value = response.data.refresh_token || ''
+      user.value = response.data.user
+      
+      console.log('设置 token:', token.value)
+      console.log('设置 user:', user.value)
       
       localStorage.setItem('token', token.value)
       if (refreshTokenValue.value) {
         localStorage.setItem('refreshToken', refreshTokenValue.value)
       }
       
-      await fetchUser()
+      console.log('localStorage 中的 token:', localStorage.getItem('token'))
+      
       return { success: true }
     } catch (error) {
+      console.error('登录错误:', error)
       return { success: false, message: error.response?.data?.detail || '登录失败' }
     }
   }

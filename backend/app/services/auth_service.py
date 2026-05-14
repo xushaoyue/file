@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
@@ -6,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import settings
 from backend.app.models.session import Session as SessionModel
+
+logger = logging.getLogger("audit.auth_service")
 
 
 pwd_context = CryptContext(
@@ -107,21 +110,31 @@ def verify_token(token: str, token_type: str = "access") -> Optional[Dict[str, A
     Returns:
         Optional[Dict[str, Any]]: 解码后的 payload 字典，验证失败返回 None
     """
+    logger.info(f"开始验证 token，类型: {token_type}")
+    
     if is_token_blacklisted(token):
+        logger.warning("Token 在黑名单中")
         return None
 
     try:
+        logger.info(f"使用 secret key 验证 token: {settings.security.secret_key[:20]}...")
+        logger.info(f"使用算法: {settings.security.algorithm}")
+        
         payload = jwt.decode(
             token,
             settings.security.secret_key,
             algorithms=[settings.security.algorithm]
         )
+        
+        logger.info(f"解码成功，payload: {payload}")
 
         if payload.get("type") != token_type:
+            logger.warning(f"Token 类型不匹配: 期望 {token_type}, 实际 {payload.get('type')}")
             return None
 
         return payload
-    except JWTError:
+    except JWTError as e:
+        logger.error(f"JWT 验证失败: {str(e)}")
         return None
 
 
@@ -177,12 +190,15 @@ def create_session(db: Session, user_id: int, session_id: str,
     from backend.app.models.session import Session as SessionModel
 
     session = SessionModel(
-        user_id=user_id,
         session_id=session_id,
-        client_ip=client_ip,
+        user_id=user_id,
+        ip_address=client_ip,
         user_agent=user_agent,
         created_at=datetime.now(timezone.utc),
         last_activity=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(
+            minutes=settings.security.access_token_expire_minutes
+        ),
         is_active=True
     )
     db.add(session)

@@ -83,10 +83,10 @@ async def login(
         )
 
     access_token = create_access_token(
-        data={"sub": user.id, "username": user.username, "role": user.role}
+        data={"sub": str(user.id), "username": user.username, "role": user.role}
     )
     refresh_token = create_refresh_token(
-        data={"sub": user.id, "username": user.username}
+        data={"sub": str(user.id), "username": user.username}
     )
 
     session_id = f"{user.id}_{datetime.now(timezone.utc).timestamp()}"
@@ -165,10 +165,10 @@ async def register(
         )
 
     access_token = create_access_token(
-        data={"sub": user.id, "username": user.username, "role": user.role}
+        data={"sub": str(user.id), "username": user.username, "role": user.role}
     )
     refresh_token = create_refresh_token(
-        data={"sub": user.id, "username": user.username}
+        data={"sub": str(user.id), "username": user.username}
     )
 
     session_id = f"{user.id}_{datetime.now(timezone.utc).timestamp()}"

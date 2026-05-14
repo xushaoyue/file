@@ -4,16 +4,19 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '/api/v1',
   timeout: 30000
 })
 
 api.interceptors.request.use(
   config => {
     const authStore = useAuthStore()
+    console.log('请求拦截器 - token:', authStore.token)
     if (authStore.token) {
       config.headers.Authorization = `Bearer ${authStore.token}`
+      console.log('添加 Authorization header:', config.headers.Authorization)
     }
+    console.log('请求配置:', config)
     return config
   },
   error => {

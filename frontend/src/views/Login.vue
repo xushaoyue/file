@@ -105,7 +105,10 @@ const handleLogin = async () => {
         
         if (result.success) {
           ElMessage.success('登录成功')
-          router.push('/')
+          // 使用 nextTick 确保状态更新后再跳转
+          setTimeout(() => {
+            router.push('/')
+          }, 100)
         } else {
           errorMessage.value = result.message
         }

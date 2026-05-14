@@ -124,14 +124,15 @@ async def health_check():
 
 
 try:
-    from backend.app.routers import auth, files, audit, users, keys
-    app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
-    app.include_router(files.router, prefix="/api/v1/files", tags=["文件"])
-    app.include_router(audit.router, prefix="/api/v1/audit", tags=["审计"])
-    app.include_router(users.router, prefix="/api/v1/users", tags=["用户"])
-    app.include_router(keys.router, prefix="/api/v1/keys", tags=["密钥"])
+    from backend.app.routers import auth, files, audit, users, ssh_keys
+    app.include_router(auth.router, prefix="", tags=["认证"])
+    app.include_router(files.router, prefix="", tags=["文件"])
+    app.include_router(audit.router, prefix="", tags=["审计"])
+    app.include_router(users.router, prefix="", tags=["用户"])
+    app.include_router(ssh_keys.router, prefix="", tags=["密钥"])
+    logger.info("所有路由模块导入成功")
 except ImportError as e:
-    logger.warning("部分路由模块导入失败: %s", str(e))
+    logger.error("路由模块导入失败: %s", str(e), exc_info=True)
 
 if __name__ == "__main__":
     import uvicorn
