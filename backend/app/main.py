@@ -38,8 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 db=db,
                 username=settings.admin.default_username,
                 password=settings.admin.default_password,
-                role="admin",
-                must_change_password=settings.admin.must_change_password
+                role="admin"
             )
             logger.info("默认管理员用户创建成功")
         else:
@@ -133,3 +132,13 @@ try:
     app.include_router(keys.router, prefix="/api/v1/keys", tags=["密钥"])
 except ImportError as e:
     logger.warning("部分路由模块导入失败: %s", str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "backend.app.main:app",
+        host=settings.app.host,
+        port=settings.app.port,
+        reload=settings.app.debug,
+        log_level=settings.log.level.lower()
+    )

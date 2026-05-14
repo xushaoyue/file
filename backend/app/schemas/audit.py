@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -49,5 +49,5 @@ class AuditLogList(BaseModel):
 class AuditStats(BaseModel):
     total_operations: int
     operations_by_type: Dict[str, int]
-    top_users: List[Dict[str, any]]
-    top_files: List[Dict[str, any]]
+    top_users: List[Dict[str, Any]]
+    top_files: List[Dict[str, Any]]

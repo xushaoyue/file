@@ -268,7 +268,7 @@ def export_logs(db: Session,
                 "user_agent": log.user_agent,
                 "session_id": log.session_id,
                 "error_message": log.error_message,
-                "metadata": log.metadata
+                "extra_data": log.extra_data
             })
 
         return json.dumps(logs_data, ensure_ascii=False, indent=2).encode("utf-8")
