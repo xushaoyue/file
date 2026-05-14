@@ -32,7 +32,7 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> AuditLog:
             - session_id: 会话 ID（可选）
             - diff_content: 差异内容（可选）
             - error_message: 错误信息（可选）
-            - metadata: 额外元数据（可选）
+            - event_metadata: 额外元数据（可选）
 
     Returns:
         AuditLog: 创建的审计日志对象
@@ -52,7 +52,7 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> AuditLog:
         session_id=event_data.get("session_id"),
         diff_content=event_data.get("diff_content"),
         error_message=event_data.get("error_message"),
-        metadata=event_data.get("metadata"),
+        event_metadata=event_data.get("event_metadata"),
         timestamp=datetime.utcnow()
     )
 

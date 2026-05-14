@@ -104,7 +104,8 @@ async def query_audit_logs(
             client_ip=log.client_ip,
             user_agent=log.user_agent,
             diff_content=log.diff_content,
-            error_message=log.error_message
+            error_message=log.error_message,
+            event_metadata=log.event_metadata
         )
         for log in result["logs"]
     ]
@@ -163,7 +164,8 @@ async def get_audit_log(
         client_ip=log.client_ip,
         user_agent=log.user_agent,
         diff_content=log.diff_content,
-        error_message=log.error_message
+        error_message=log.error_message,
+        event_metadata=log.event_metadata
     )
 
 
