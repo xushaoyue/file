@@ -1,11 +1,11 @@
-# 源代码审计系统启动教程
+# 源码安全审计系统启动教程
 
 ## 项目架构
 
 | 组件 | 技术栈                           | 端口   |
-| -- | ----------------------------- | ---- |
-| 前端 | Vue 3 + Vite + Element Plus   | 3000 |
-| 后端 | FastAPI + SQLAlchemy + SQLite | 8000 |
+|------|---------------------------------|--------|
+| 前端 | Vue 3 + Vite + Element Plus   | 3000   |
+| 后端 | FastAPI + SQLAlchemy + SQLite | 8000   |
 
 ***
 
@@ -21,14 +21,14 @@
 
 ```bash
 # 进入后端目录
-cd e:\工作\tools\codeSafe\backend
+cd backend
 
 # 安装 Python 依赖
 pip install -r requirements.txt
 
 # 启动后端服务
-cd e:\工作\tools\codeSafe
-$env:CONFIG_PATH="./config/config.yaml"
+cd ..
+export CONFIG_PATH="./config/config.yaml"
 python -m backend.app.main
 ```
 
@@ -43,7 +43,7 @@ python -m backend.app.main
 
 ```bash
 # 新开一个终端，进入前端目录
-cd e:\工作\tools\codeSafe\frontend
+cd frontend
 
 # 安装前端依赖
 npm install
@@ -66,7 +66,7 @@ npm run dev
 
 ## 配置文件说明
 
-主配置文件位于 `e:\工作\tools\codeSafe\config\config.yaml`：
+主配置文件位于 `config/config.yaml`：
 
 ```yaml
 app:
@@ -80,7 +80,7 @@ monitor:
   enabled: true
   watch_paths:        # 监控的代码目录
     - "/source"
-    - "D:/Projects/SourceCode"
+    - "./source"
 ```
 
 ***
@@ -94,4 +94,3 @@ npm run build
 # 前端预览生产版本
 npm run preview
 ```
-
