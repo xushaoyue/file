@@ -23,6 +23,6 @@ class AuditLog(Base):
     session_id = Column(String(100))
     diff_content = Column(Text)
     error_message = Column(Text)
-    metadata = Column(JSON)
+    event_metadata = Column(JSON)
 
     user = relationship("User", back_populates="audit_logs")
