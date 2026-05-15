@@ -55,7 +55,6 @@ def _get_base_path() -> Path:
     Returns:
         Path: 基础路径
     """
-    return Path(settings.file_access.allowed_encodings[0] if hasattr(settings.file_access, 'allowed_encodings') else "/workspace")
     return Path("/workspace")
 
 

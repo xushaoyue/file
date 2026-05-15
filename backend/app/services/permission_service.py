@@ -142,7 +142,7 @@ def set_user_permissions(db: Session, user_id: int,
     for perm_data in permissions:
         permission = Permission(
             user_id=user_id,
-            allowed_path=perm_data["path"],
+            allowed_path=perm_data.get("path", perm_data.get("allowed_path")),
             can_read=perm_data.get("can_read", False),
             can_write=perm_data.get("can_write", False),
             can_delete=perm_data.get("can_delete", False),

@@ -31,7 +31,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         bool: 密码是否匹配
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    # bcrypt 最大支持72字节密码，过长的密码需要截断
+    return pwd_context.verify(plain_password[:72], hashed_password)
 
 
 def get_password_hash(password: str) -> str:
@@ -44,7 +45,8 @@ def get_password_hash(password: str) -> str:
     Returns:
         str: 哈希后的密码字符串
     """
-    return pwd_context.hash(password)
+    # bcrypt 最大支持72字节密码，过长的密码需要截断
+    return pwd_context.hash(password[:72])
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

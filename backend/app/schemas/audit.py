@@ -20,7 +20,7 @@ class AuditLogResponse(BaseModel):
     user_agent: Optional[str] = None
     diff_content: Optional[str] = None
     error_message: Optional[str] = None
-    event_metadata: Optional[dict] = None
+    extra_data: Optional[dict] = None
 
     class Config:
         from_attributes = True
