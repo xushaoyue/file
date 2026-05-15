@@ -11,11 +11,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 os.environ['CONFIG_PATH'] = './config/config.yaml'
+os.environ['PYTEST_RUNNING'] = '1'
 
 from backend.app.main import app
 from backend.app.database import Base, get_db
 from backend.app.models.user import User
-from backend.app.services.auth_service import get_password_hash
+from backend.app.services.auth_service import get_password_hash, TOKEN_BLACKLIST
 
 
 TEST_DATABASE_URL = "sqlite:///./test_data/test_audit.db"
@@ -36,6 +37,12 @@ def override_get_db():
         yield db
     finally:
         db.close()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def clear_token_blacklist():
+    """在每个测试前清空token黑名单"""
+    TOKEN_BLACKLIST.clear()
 
 
 @pytest.fixture(scope="function")
@@ -93,7 +100,7 @@ def test_admin(db_session):
     return admin
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def user_token(client, test_user):
     """获取普通用户的访问令牌"""
     response = client.post(
@@ -104,7 +111,7 @@ def user_token(client, test_user):
     return response.json()["access_token"]
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def admin_token(client, test_admin):
     """获取管理员的访问令牌"""
     response = client.post(
@@ -115,13 +122,13 @@ def admin_token(client, test_admin):
     return response.json()["access_token"]
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def auth_headers(user_token):
     """普通用户认证头"""
     return {"Authorization": f"Bearer {user_token}"}
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def admin_auth_headers(admin_token):
     """管理员认证头"""
     return {"Authorization": f"Bearer {admin_token}"}

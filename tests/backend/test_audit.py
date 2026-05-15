@@ -115,7 +115,7 @@ class TestAuditLogsExport:
             headers=admin_auth_headers
         )
         assert response.status_code == 200
-        assert response.headers["content-type"] == "text/csv"
+        assert "text/csv" in response.headers["content-type"]
 
     def test_export_logs_as_json(self, client, admin_auth_headers):
         """测试导出日志为 JSON 格式"""

@@ -23,6 +23,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    password: Optional[str] = None
 
 
 class UserResponse(BaseModel):

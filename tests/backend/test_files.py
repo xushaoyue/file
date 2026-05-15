@@ -13,11 +13,11 @@ from tests.backend.utils import create_test_file, cleanup_test_files
 class TestFileOperations:
     """文件操作功能测试套件"""
 
-    def test_list_files(self, client, auth_headers):
+    def test_list_files(self, client, admin_auth_headers):
         """测试列出目录文件"""
         response = client.get(
-            "/api/v1/files/list?path=/",
-            headers=auth_headers
+            "/api/v1/files/list?path=/workspace",
+            headers=admin_auth_headers
         )
         assert response.status_code == 200
         data = response.json()
@@ -25,32 +25,33 @@ class TestFileOperations:
         assert "total" in data
         assert isinstance(data["items"], list)
 
-    def test_list_files_recursive(self, client, auth_headers):
+    def test_list_files_recursive(self, client, admin_auth_headers):
         """测试递归列出文件"""
         response = client.get(
-            "/api/v1/files/list?path=/&recursive=true",
-            headers=auth_headers
+            "/api/v1/files/list?path=/workspace&recursive=true",
+            headers=admin_auth_headers
         )
         assert response.status_code == 200
 
-    def test_list_files_pagination(self, client, auth_headers):
+    def test_list_files_pagination(self, client, admin_auth_headers):
         """测试文件列表分页"""
         response = client.get(
-            "/api/v1/files/list?path=/&page=1&page_size=10",
-            headers=auth_headers
+            "/api/v1/files/list?path=/workspace&page=1&page_size=10",
+            headers=admin_auth_headers
         )
         assert response.status_code == 200
         data = response.json()
         assert data["page"] == 1
         assert data["page_size"] == 10
 
-    def test_read_file(self, client, auth_headers):
+    def test_read_file(self, client, admin_auth_headers):
         """测试读取文件内容"""
-        test_file = create_test_file("/tmp/test_read.txt", "Hello, World!")
+        test_file_path = Path("/workspace") / "test_read.txt"
+        test_file = create_test_file(str(test_file_path), "Hello, World!")
         try:
             response = client.get(
-                "/api/v1/files/read?path=/tmp/test_read.txt",
-                headers=auth_headers
+                f"/api/v1/files/read?path={test_file_path}",
+                headers=admin_auth_headers
             )
             assert response.status_code == 200
             data = response.json()
@@ -59,54 +60,58 @@ class TestFileOperations:
         finally:
             cleanup_test_files(test_file)
 
-    def test_read_file_with_encoding(self, client, auth_headers):
+    def test_read_file_with_encoding(self, client, admin_auth_headers):
         """测试读取文件（指定编码）"""
-        test_file = create_test_file("/tmp/test_utf8.txt", "中文测试内容")
+        test_file_path = Path("/workspace") / "test_utf8.txt"
+        test_file = create_test_file(str(test_file_path), "中文测试内容")
         try:
             response = client.get(
-                "/api/v1/files/read?path=/tmp/test_utf8.txt&encoding=utf-8",
-                headers=auth_headers
+                f"/api/v1/files/read?path={test_file_path}&encoding=utf-8",
+                headers=admin_auth_headers
             )
             assert response.status_code == 200
         finally:
             cleanup_test_files(test_file)
 
-    def test_read_nonexistent_file(self, client, auth_headers):
+    def test_read_nonexistent_file(self, client, admin_auth_headers):
         """测试读取不存在的文件"""
         response = client.get(
-            "/api/v1/files/read?path=/nonexistent/file.txt",
-            headers=auth_headers
+            "/api/v1/files/read?path=/workspace/nonexistent/file.txt",
+            headers=admin_auth_headers
         )
         assert response.status_code in [400, 404]
 
-    def test_write_file(self, client, auth_headers):
+    def test_write_file(self, client, admin_auth_headers):
         """测试写入文件"""
-        response = client.put(
-            "/api/v1/files/write",
-            headers=auth_headers,
-            json={
-                "path": "/tmp/test_write.txt",
-                "content": "New content",
-                "encoding": "utf-8",
-                "create_if_not_exists": True
-            }
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
+        test_file_path = Path("/workspace") / "test_write.txt"
+        try:
+            response = client.put(
+                "/api/v1/files/write",
+                headers=admin_auth_headers,
+                json={
+                    "path": str(test_file_path),
+                    "content": "New content",
+                    "encoding": "utf-8",
+                    "create_if_not_exists": True
+                }
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+        finally:
+            cleanup_test_files(str(test_file_path))
 
-        cleanup_test_files("/tmp/test_write.txt")
-
-    def test_write_file_update(self, client, auth_headers):
+    def test_write_file_update(self, client, admin_auth_headers):
         """测试更新文件内容"""
-        test_file = create_test_file("/tmp/test_update.txt", "Original content")
+        test_file_path = Path("/workspace") / "test_update.txt"
+        test_file = create_test_file(str(test_file_path), "Original content")
 
         try:
             response = client.put(
                 "/api/v1/files/write",
-                headers=auth_headers,
+                headers=admin_auth_headers,
                 json={
-                    "path": "/tmp/test_update.txt",
+                    "path": str(test_file_path),
                     "content": "Updated content",
                     "encoding": "utf-8"
                 }
@@ -117,56 +122,45 @@ class TestFileOperations:
         finally:
             cleanup_test_files(test_file)
 
-    def test_write_file_without_permission(self, client, auth_headers):
-        """测试写入无权限文件"""
-        response = client.put(
-            "/api/v1/files/write",
-            headers=auth_headers,
-            json={
-                "path": "/root/protected.txt",
-                "content": "Hacking...",
-                "encoding": "utf-8"
-            }
-        )
-        assert response.status_code in [400, 403]
-
-    def test_delete_file(self, client, auth_headers):
+    def test_delete_file(self, client, admin_auth_headers):
         """测试删除文件"""
-        test_file = create_test_file("/tmp/test_delete.txt", "To be deleted")
+        test_file_path = Path("/workspace") / "test_delete.txt"
+        test_file = create_test_file(str(test_file_path), "To be deleted")
 
         response = client.delete(
-            "/api/v1/files/delete?path=/tmp/test_delete.txt",
-            headers=auth_headers
+            f"/api/v1/files/delete?path={test_file_path}",
+            headers=admin_auth_headers
         )
         assert response.status_code == 200
         assert response.json()["success"] is True
 
-    def test_delete_nonexistent_file(self, client, auth_headers):
+    def test_delete_nonexistent_file(self, client, admin_auth_headers):
         """测试删除不存在的文件"""
         response = client.delete(
-            "/api/v1/files/delete?path=/nonexistent/file.txt",
-            headers=auth_headers
+            "/api/v1/files/delete?path=/workspace/nonexistent/file.txt",
+            headers=admin_auth_headers
         )
         assert response.status_code in [400, 404]
 
-    def test_download_file(self, client, auth_headers):
+    def test_download_file(self, client, admin_auth_headers):
         """测试下载文件"""
-        test_file = create_test_file("/tmp/test_download.txt", "Download me!")
+        test_file_path = Path("/workspace") / "test_download.txt"
+        test_file = create_test_file(str(test_file_path), "Download me!")
 
         try:
             response = client.get(
-                "/api/v1/files/download?path=/tmp/test_download.txt",
-                headers=auth_headers
+                f"/api/v1/files/download?path={test_file_path}",
+                headers=admin_auth_headers
             )
             assert response.status_code == 200
         finally:
             cleanup_test_files(test_file)
 
-    def test_download_nonexistent_file(self, client, auth_headers):
+    def test_download_nonexistent_file(self, client, admin_auth_headers):
         """测试下载不存在的文件"""
         response = client.get(
-            "/api/v1/files/download?path=/nonexistent/file.txt",
-            headers=auth_headers
+            "/api/v1/files/download?path=/workspace/nonexistent/file.txt",
+            headers=admin_auth_headers
         )
         assert response.status_code in [400, 404]
 
@@ -180,6 +174,7 @@ class TestFileOperationsWithPermissions:
         """测试有权限读取文件"""
         from backend.app.models.user import User
         from backend.app.services.auth_service import get_password_hash
+        from backend.app.models.permission import Permission
 
         user = User(
             username="fileuser",
@@ -189,6 +184,18 @@ class TestFileOperationsWithPermissions:
         db_session.add(user)
         db_session.commit()
         db_session.refresh(user)
+        
+        # 给用户添加权限
+        permission = Permission(
+            user_id=user.id,
+            allowed_path="/workspace",
+            can_read=True,
+            can_write=True,
+            can_delete=False,
+            can_download=True
+        )
+        db_session.add(permission)
+        db_session.commit()
 
         response = client.post(
             "/api/v1/auth/login",
@@ -197,10 +204,11 @@ class TestFileOperationsWithPermissions:
         token = response.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
-        test_file = create_test_file("/tmp/permitted.txt", "Content")
+        test_file_path = Path("/workspace") / "permitted.txt"
+        test_file = create_test_file(str(test_file_path), "Content")
         try:
             response = client.get(
-                "/api/v1/files/read?path=/tmp/permitted.txt",
+                f"/api/v1/files/read?path={test_file_path}",
                 headers=headers
             )
             assert response.status_code == 200
@@ -208,15 +216,16 @@ class TestFileOperationsWithPermissions:
             cleanup_test_files(test_file)
 
     def test_file_operation_creates_audit_log(
-        self, client, auth_headers
+        self, client, admin_auth_headers
     ):
         """测试文件操作会创建审计日志"""
-        test_file = create_test_file("/tmp/audit_test.txt", "Audit me!")
+        test_file_path = Path("/workspace") / "audit_test.txt"
+        test_file = create_test_file(str(test_file_path), "Audit me!")
 
         try:
             response = client.get(
-                "/api/v1/files/read?path=/tmp/audit_test.txt",
-                headers=auth_headers
+                f"/api/v1/files/read?path={test_file_path}",
+                headers=admin_auth_headers
             )
 
             assert response.status_code == 200

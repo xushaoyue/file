@@ -217,6 +217,7 @@ class TestUserPermissions:
             f"/api/v1/users/{test_user.id}/permissions",
             headers=admin_auth_headers,
             json={
+                "user_id": test_user.id,
                 "permissions": [
                     {
                         "allowed_path": "/source/project1",

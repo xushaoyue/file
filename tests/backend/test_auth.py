@@ -119,11 +119,18 @@ class TestAuthentication:
         response = client.post("/api/v1/auth/logout")
         assert response.status_code == 401
 
-    def test_get_current_user(self, client, user_token, test_user):
+    def test_get_current_user(self, client, test_user):
         """测试获取当前用户信息"""
+        # 登录获取新token
+        login_response = client.post(
+            "/api/v1/auth/login",
+            data={"username": "testuser", "password": "TestPassword123"}
+        )
+        token = login_response.json()["access_token"]
+        
         response = client.get(
             "/api/v1/auth/me",
-            headers={"Authorization": f"Bearer {user_token}"}
+            headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
         data = response.json()
@@ -162,7 +169,7 @@ class TestAuthenticationSecurity:
         )
         assert response.status_code == 401
 
-    def test_multiple_failed_logins_tracking(self, client, test_user):
+    def test_multiple_failed_logins_tracking(self, client, test_user, db_session):
         """测试多次登录失败追踪"""
         for _ in range(3):
             client.post(
@@ -171,9 +178,6 @@ class TestAuthenticationSecurity:
             )
 
         from backend.app.models.user import User
-        from backend.app.database import SessionLocal
-
-        db = SessionLocal()
-        user = db.query(User).filter(User.username == "testuser").first()
-        assert user.failed_attempts >= 3
-        db.close()
+        # 刷新用户对象，从数据库中获取最新状态
+        db_session.refresh(test_user)
+        assert test_user.failed_attempts >= 3

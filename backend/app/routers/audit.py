@@ -105,7 +105,7 @@ async def query_audit_logs(
             user_agent=log.user_agent,
             diff_content=log.diff_content,
             error_message=log.error_message,
-            event_metadata=log.event_metadata
+            extra_data=log.extra_data
         )
         for log in result["logs"]
     ]
@@ -165,7 +165,7 @@ async def get_audit_log(
         user_agent=log.user_agent,
         diff_content=log.diff_content,
         error_message=log.error_message,
-        event_metadata=log.event_metadata
+        extra_data=log.extra_data
     )
 
 
