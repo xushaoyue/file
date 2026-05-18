@@ -11,7 +11,7 @@ from git import Repo, GitCommandError
 from backend.app.models.git_repository import GitRepository
 from backend.app.models.audit_log import AuditLog
 from backend.app.config import settings
-from backend.app.services.audit_service import log_event
+from backend.app.services.audit_service import log_event, log_batch_operation, get_current_time
 
 logger = logging.getLogger("audit.git_service")
 
@@ -85,15 +85,37 @@ class GitService:
             self.db.add(repo_record)
             self.db.commit()
 
+            cloned_files = []
+            for root, dirs, files in os.walk(abs_local_path):
+                for file in files:
+                    cloned_files.append(os.path.join(root, file))
+
             self._log_git_operation(None, name, "clone", {
                 "repository_name": name,
                 "remote_url": remote_url,
                 "local_path": str(abs_local_path),
-                "branch": branch
+                "branch": branch,
+                "total_files": len(cloned_files)
             })
 
-            logger.info(f"仓库 '{name}' 克隆成功: {remote_url} -> {abs_local_path}")
-            return {"success": True, "message": "仓库克隆成功", "repository": repo_record}
+            if len(cloned_files) > settings.audit.batch_operation_threshold:
+                log_batch_operation(
+                    self.db,
+                    event_type="git_clone",
+                    operation="clone",
+                    file_paths=cloned_files,
+                    username="system",
+                    user_role="system",
+                    status="success",
+                    extra_data={
+                        "repository_name": name,
+                        "remote_url": remote_url,
+                        "branch": branch
+                    }
+                )
+
+            logger.info(f"仓库 '{name}' 克隆成功: {remote_url} -> {abs_local_path} ({len(cloned_files)} files)")
+            return {"success": True, "message": "仓库克隆成功", "repository": repo_record, "files_count": len(cloned_files)}
 
         except GitCommandError as e:
             error_msg = f"克隆仓库失败: {str(e)}"
@@ -153,15 +175,38 @@ class GitService:
             repo_record.status = "cloned"
             self.db.commit()
 
+            synced_files = []
+            for root, dirs, files in os.walk(repo_record.local_path):
+                for file in files:
+                    synced_files.append(os.path.join(root, file))
+
             self._log_git_operation(None, repo_record.name, "pull", {
                 "repository_name": repo_record.name,
                 "branch": repo_record.branch,
                 "commit_before": before_hash,
-                "commit_after": after_hash
+                "commit_after": after_hash,
+                "total_files": len(synced_files)
             })
 
-            logger.info(f"仓库 '{repo_record.name}' 同步成功")
-            return {"success": True, "message": "仓库同步成功", "commit_before": before_hash, "commit_after": after_hash}
+            if len(synced_files) > settings.audit.batch_operation_threshold:
+                log_batch_operation(
+                    self.db,
+                    event_type="git_pull",
+                    operation="sync",
+                    file_paths=synced_files,
+                    username="system",
+                    user_role="system",
+                    status="success",
+                    extra_data={
+                        "repository_name": repo_record.name,
+                        "branch": repo_record.branch,
+                        "commit_before": before_hash,
+                        "commit_after": after_hash
+                    }
+                )
+
+            logger.info(f"仓库 '{repo_record.name}' 同步成功 ({len(synced_files)} files)")
+            return {"success": True, "message": "仓库同步成功", "commit_before": before_hash, "commit_after": after_hash, "files_count": len(synced_files)}
 
         except GitCommandError as e:
             error_msg = f"同步仓库失败: {str(e)}"
@@ -212,7 +257,7 @@ class GitService:
             "file_path": f"/git/{repo_name}",
             "status": "success",
             "extra_data": details,
-            "timestamp": datetime.now(timezone.utc)
+            "timestamp": get_current_time()
         }
         try:
             log_event(self.db, event_data)

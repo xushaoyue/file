@@ -1,5 +1,6 @@
 import os
 import time
+import fnmatch
 import threading
 from typing import Optional, Dict, Any, List, Callable
 from pathlib import Path
@@ -8,7 +9,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 from backend.app.config import settings
-from backend.app.services.audit_service import log_event, write_to_file
+from backend.app.services.audit_service import log_event, write_to_file, get_current_time
 from backend.app.database import SessionLocal
 
 
@@ -25,6 +26,7 @@ class AuditEventHandler(FileSystemEventHandler):
         pending_events: 待处理的事件队列
         batch_size: 批处理大小
         batch_timeout: 批处理超时时间（秒）
+        audit_config: 审计配置
     """
 
     def __init__(self,
@@ -54,10 +56,11 @@ class AuditEventHandler(FileSystemEventHandler):
         self.watch_paths = watch_paths or settings.monitor.watch_paths
         self.exclude_paths = exclude_paths or settings.monitor.exclude_paths
         self.exclude_extensions = exclude_extensions or settings.monitor.exclude_extensions
-        self.capture_diff = capture_diff
+        self.capture_diff = capture_diff and settings.audit.log_level == "verbose"
         self.diff_context_lines = diff_context_lines
         self.batch_size = batch_size
         self.batch_timeout = batch_timeout
+        self.audit_config = settings.audit
 
         self._pending_events: List[Dict[str, Any]] = []
         self._last_flush = time.time()
@@ -73,14 +76,9 @@ class AuditEventHandler(FileSystemEventHandler):
         Returns:
             bool: 是否应该排除
         """
-        path_obj = Path(path)
-
         for exclude_path in self.exclude_paths:
-            try:
-                if path_obj.is_relative_to(Path(exclude_path)):
-                    return True
-            except (ValueError, OSError):
-                pass
+            if fnmatch.fnmatch(path.replace("\\", "/"), exclude_path.replace("\\", "/")):
+                return True
 
         for exclude_ext in self.exclude_extensions:
             if path.endswith(exclude_ext):
@@ -124,6 +122,26 @@ class AuditEventHandler(FileSystemEventHandler):
         except OSError:
             return None
 
+    def _to_relative_path(self, path: str) -> str:
+        """
+        将绝对路径转换为相对于监控路径的路径。
+
+        Args:
+            path: 原始绝对路径
+
+        Returns:
+            str: 相对路径（以 / 开头），如果不在监控路径下则返回原路径
+        """
+        path_obj = Path(path)
+        for watch_path in self.watch_paths:
+            try:
+                watch_obj = Path(os.path.abspath(watch_path))
+                relative = path_obj.relative_to(watch_obj)
+                return "/" + relative.as_posix()
+            except (ValueError, OSError):
+                continue
+        return path
+
     def _create_event_data(self, event: FileSystemEvent) -> Dict[str, Any]:
         """
         创建事件数据字典。
@@ -150,13 +168,15 @@ class AuditEventHandler(FileSystemEventHandler):
             "closed": "close"
         }
 
+        dest_path = getattr(event, "dest_path", None)
+
         return {
             "event_type": event_type_map.get(event.event_type, event.event_type),
             "operation": operation_map.get(event.event_type, "unknown"),
-            "file_path": event.src_path,
-            "dest_path": getattr(event, "dest_path", None),
+            "file_path": self._to_relative_path(event.src_path),
+            "dest_path": self._to_relative_path(dest_path) if dest_path else None,
             "is_directory": event.is_directory,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": get_current_time(),
             "status": "success",
             "username": "system"
         }
@@ -191,6 +211,14 @@ class AuditEventHandler(FileSystemEventHandler):
         Args:
             event: 文件系统事件对象
         """
+        # 过滤掉目录修改事件（通常是无意义的系统行为，如访问时间更新）
+        if event.event_type == "modified" and event.is_directory:
+            return
+            
+        # 过滤掉 close 事件（大多数情况下不需要记录）
+        if event.event_type == "closed":
+            return
+
         if self._should_exclude(event.src_path):
             return
 

@@ -41,10 +41,12 @@ api.interceptors.response.use(
               error.config.headers.Authorization = `Bearer ${authStore.token}`
               return api.request(error.config)
             } catch {
+              ElMessage.warning('登录已过期，请重新登录')
               authStore.logout()
               router.push('/login')
             }
           } else {
+            ElMessage.warning('登录已过期，请重新登录')
             authStore.logout()
             router.push('/login')
           }

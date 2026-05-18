@@ -83,8 +83,12 @@
                   style="width: 100%"
                 >
                   <el-table-column prop="username" label="用户" width="120" />
-                  <el-table-column prop="operation" label="操作" width="150" />
-                  <el-table-column prop="resource" label="资源" />
+                  <el-table-column prop="operation" label="操作" width="120">
+                    <template #default="{ row }">
+                      <el-tag>{{ getOperationLabel(row.operation) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="file_path" label="资源" />
                   <el-table-column prop="status" label="状态" width="100">
                     <template #default="{ row }">
                       <el-tag :type="row.status === 'success' ? 'success' : 'danger'">
@@ -92,9 +96,9 @@
                       </el-tag>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="created_at" label="时间" width="180">
+                  <el-table-column prop="timestamp" label="时间" width="180">
                     <template #default="{ row }">
-                      {{ formatTime(row.created_at) }}
+                      {{ formatTime(row.timestamp) }}
                     </template>
                   </el-table-column>
                 </el-table>
@@ -171,11 +175,13 @@ const fetchStats = async () => {
   try {
     const response = await auditStore.fetchStats()
     if (response) {
+      const today = new Date().toISOString().split('T')[0]
+      const todayCount = response.daily_trend?.find(d => d.date === today)?.count || 0
       stats.value = {
         totalOperations: response.total_operations || 0,
-        todayOperations: response.today_operations || 0,
-        activeUsers: response.active_users || 0,
-        failedOperations: response.failed_operations || 0
+        todayOperations: todayCount,
+        activeUsers: response.top_users?.filter(u => u.username !== 'system').length || 0,
+        failedOperations: 0
       }
     }
   } catch (error) {
@@ -195,6 +201,44 @@ const fetchRecentLogs = async () => {
 const formatTime = (time) => {
   if (!time) return ''
   return new Date(time).toLocaleString('zh-CN')
+}
+
+const getOperationLabel = (operation) => {
+  const labels = {
+    login: '登录',
+    logout: '登出',
+    register: '注册',
+    refresh_token: '刷新令牌',
+    list: '列表',
+    read: '读取',
+    view: '查看',
+    write: '写入',
+    create: '创建',
+    update: '更新',
+    modify: '修改',
+    delete: '删除',
+    download: '下载',
+    upload: '上传',
+    create_directory: '创建目录',
+    rename: '重命名',
+    move: '移动',
+    copy: '复制',
+    clone: '克隆',
+    sync: '同步',
+    pull: '拉取',
+    unknown: '未知',
+    list_keys: '列出密钥',
+    add_key: '添加密钥',
+    delete_key: '删除密钥',
+    list_users: '列出用户',
+    create_user: '创建用户',
+    update_user: '更新用户',
+    delete_user: '删除用户',
+    set_permissions: '设置权限',
+    change_password: '修改密码',
+    reset_password: '重置密码'
+  }
+  return labels[operation] || operation
 }
 </script>
 

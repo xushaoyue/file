@@ -17,8 +17,9 @@ from backend.app.schemas.file import (
 )
 from backend.app.schemas.common import ResponseModel
 from backend.app.services import file_service
-from backend.app.services.audit_service import log_event
+from backend.app.services.audit_service import log_event, should_log_operation
 from backend.app.models.user import User
+from backend.app.config import settings
 
 router = APIRouter(prefix="/api/v1/files", tags=["文件管理"])
 
@@ -82,20 +83,21 @@ async def list_files(
         for item in result["files"]
     ]
 
-    log_event(
-        db,
-        event_data={
-            "event_type": "file_operation",
-            "user_id": current_user.id,
-            "username": current_user.username,
-            "user_role": current_user.role,
-            "operation": "list",
-            "file_path": path,
-            "status": "success",
-            "client_ip": client_ip,
-            "user_agent": user_agent
-        }
-    )
+    if should_log_operation("list"):
+        log_event(
+            db,
+            event_data={
+                "event_type": "file_operation",
+                "user_id": current_user.id,
+                "username": current_user.username,
+                "user_role": current_user.role,
+                "operation": "list",
+                "file_path": path,
+                "status": "success",
+                "client_ip": client_ip,
+                "user_agent": user_agent
+            }
+        )
 
     return FileListResponse(
         path=path,
@@ -139,6 +141,28 @@ async def read_file(
     )
 
     if "error" in result:
+        if should_log_operation("read"):
+            log_event(
+                db,
+                event_data={
+                    "event_type": "file_operation",
+                    "user_id": current_user.id,
+                    "username": current_user.username,
+                    "user_role": current_user.role,
+                    "operation": "read",
+                    "file_path": path,
+                    "status": "failure",
+                    "client_ip": client_ip,
+                    "user_agent": user_agent,
+                    "error_message": result["error"]
+                }
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["error"]
+        )
+
+    if should_log_operation("read"):
         log_event(
             db,
             event_data={
@@ -148,32 +172,12 @@ async def read_file(
                 "user_role": current_user.role,
                 "operation": "read",
                 "file_path": path,
-                "status": "failure",
+                "file_size_after": result.get("size"),
+                "status": "success",
                 "client_ip": client_ip,
-                "user_agent": user_agent,
-                "error_message": result["error"]
+                "user_agent": user_agent
             }
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result["error"]
-        )
-
-    log_event(
-        db,
-        event_data={
-            "event_type": "file_operation",
-            "user_id": current_user.id,
-            "username": current_user.username,
-            "user_role": current_user.role,
-            "operation": "read",
-            "file_path": path,
-            "file_size_after": result.get("size"),
-            "status": "success",
-            "client_ip": client_ip,
-            "user_agent": user_agent
-        }
-    )
 
     return FileReadResponse(
         path=result["path"],

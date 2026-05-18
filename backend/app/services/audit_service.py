@@ -9,10 +9,39 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, func
 from sqlalchemy.exc import OperationalError
 
-from backend.app.models.audit_log import AuditLog
 from backend.app.config import settings
+from backend.app.models.audit_log import AuditLog
 
 logger = logging.getLogger("audit.audit_service")
+
+
+def get_current_time() -> datetime:
+    """获取当前 UTC 时间（naive）"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def should_log_operation(operation: str) -> bool:
+    """
+    根据配置判断是否应该记录某类操作的审计日志。
+
+    Args:
+        operation: 操作类型（如 "read", "list", "write", "delete" 等）
+
+    Returns:
+        bool: 是否应该记录日志
+    """
+    audit_config = settings.audit
+
+    if audit_config.log_level == "minimal":
+        return operation in ["write", "delete", "upload", "move", "copy", "rename"]
+    
+    if not audit_config.log_list_operations and operation == "list":
+        return False
+    
+    if not audit_config.log_read_operations and operation == "read":
+        return False
+    
+    return True
 
 
 def log_event(db: Session, event_data: Dict[str, Any]) -> Optional[AuditLog]:
@@ -41,12 +70,19 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> Optional[AuditLog]:
     Returns:
         Optional[AuditLog]: 创建的审计日志对象，失败返回 None
     """
+    operation = event_data.get("operation")
+    if operation and not should_log_operation(operation):
+        return None
+
+    if event_data.get("file_path") == "/":
+        return None
+
     log = AuditLog(
         event_type=event_data.get("event_type", "general"),
         user_id=event_data.get("user_id"),
         username=event_data.get("username"),
         user_role=event_data.get("user_role"),
-        operation=event_data.get("operation"),
+        operation=operation,
         file_path=event_data.get("file_path", ""),
         file_size_before=event_data.get("file_size_before"),
         file_size_after=event_data.get("file_size_after"),
@@ -57,7 +93,7 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> Optional[AuditLog]:
         diff_content=event_data.get("diff_content"),
         error_message=event_data.get("error_message"),
         extra_data=event_data.get("extra_data"),
-        timestamp=datetime.now(timezone.utc)
+        timestamp=event_data.get("timestamp", get_current_time())
     )
 
     db.add(log)
@@ -67,6 +103,75 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> Optional[AuditLog]:
         return log
     except OperationalError as e:
         logger.warning("审计日志写入失败 (将尝试回滚重试): %s", str(e))
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        db.add(log)
+        db.flush()
+        db.commit()
+        return log
+
+
+def log_batch_operation(db: Session, 
+                        event_type: str,
+                        operation: str,
+                        file_paths: List[str],
+                        user_id: Optional[int] = None,
+                        username: Optional[str] = None,
+                        user_role: Optional[str] = None,
+                        status: str = "success",
+                        extra_data: Optional[Dict[str, Any]] = None) -> Optional[AuditLog]:
+    """
+    记录批量文件操作的聚合审计日志。
+
+    Args:
+        db: 数据库会话
+        event_type: 事件类型
+        operation: 操作类型
+        file_paths: 涉及的文件路径列表
+        user_id: 用户 ID（可选）
+        username: 用户名（可选）
+        user_role: 用户角色（可选）
+        status: 状态 ("success", "failure", "error")
+        extra_data: 额外元数据（可选）
+
+    Returns:
+        Optional[AuditLog]: 创建的审计日志对象，失败返回 None
+    """
+    if not file_paths:
+        return None
+
+    audit_config = settings.audit
+    
+    aggregated_data = {
+        "total_files": len(file_paths),
+        "sample_files": file_paths[:10],
+        "has_more": len(file_paths) > 10
+    }
+    
+    if extra_data:
+        aggregated_data.update(extra_data)
+
+    log = AuditLog(
+        event_type=event_type,
+        user_id=user_id,
+        username=username or "system",
+        user_role=user_role or "system",
+        operation=operation,
+        file_path=file_paths[0] if file_paths else "",
+        status=status,
+        extra_data=aggregated_data,
+        timestamp=get_current_time()
+    )
+
+    db.add(log)
+    try:
+        db.flush()
+        db.commit()
+        return log
+    except OperationalError as e:
+        logger.warning("批量审计日志写入失败: %s", str(e))
         try:
             db.rollback()
         except Exception:
@@ -413,7 +518,7 @@ def cleanup_old_logs(db: Session, days: int = None) -> int:
     if days is None:
         days = settings.log.retention_days
 
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_date = get_current_time() - timedelta(days=days)
 
     count = db.query(AuditLog).filter(
         AuditLog.timestamp < cutoff_date
@@ -460,7 +565,7 @@ def get_failed_operations(db: Session,
     Returns:
         List[AuditLog]: 失败的审计日志列表
     """
-    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff_time = get_current_time() - timedelta(hours=hours)
 
     return db.query(AuditLog).filter(
         AuditLog.timestamp >= cutoff_time,

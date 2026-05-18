@@ -10,7 +10,8 @@ from backend.app.schemas.user import (
     UserCreate,
     UserUpdate,
     UserResponse,
-    UserPermission
+    UserPermission,
+    ChangePassword
 )
 from backend.app.schemas.common import ResponseModel
 from backend.app.services import user_service
@@ -72,6 +73,7 @@ async def list_users(
             id=user.id,
             username=user.username,
             email=user.email,
+            full_name=user.full_name,
             role=user.role,
             is_active=user.is_active,
             created_at=user.created_at,
@@ -132,6 +134,7 @@ async def create_user_endpoint(
             username=user_data.username,
             password=user_data.password,
             email=user_data.email,
+            full_name=user_data.full_name,
             role=user_data.role
         )
     except ValueError as e:
@@ -159,6 +162,7 @@ async def create_user_endpoint(
         id=user.id,
         username=user.username,
         email=user.email,
+        full_name=user.full_name,
         role=user.role,
         is_active=user.is_active,
         created_at=user.created_at,
@@ -203,6 +207,7 @@ async def get_user(
         id=user.id,
         username=user.username,
         email=user.email,
+        full_name=user.full_name,
         role=user.role,
         is_active=user.is_active,
         created_at=user.created_at,
@@ -283,6 +288,7 @@ async def update_user(
         id=user.id,
         username=user.username,
         email=user.email,
+        full_name=user.full_name,
         role=user.role,
         is_active=user.is_active,
         created_at=user.created_at,
@@ -382,25 +388,38 @@ async def set_user_permissions(
 
     from backend.app.services.permission_service import set_user_permissions
 
-    success = set_user_permissions(
-        db,
-        user_id=user_id,
-        permissions=[
-            {
+    # 处理权限数据，支持字符串和对象格式
+    processed_permissions = []
+    for perm in permission_data.permissions:
+        if isinstance(perm, str):
+            # 如果是字符串格式，转换成默认权限对象
+            processed_permissions.append({
+                "allowed_path": perm,
+                "can_read": True,
+                "can_write": False,
+                "can_delete": False,
+                "can_download": True
+            })
+        else:
+            # 已经是对象格式
+            processed_permissions.append({
                 "allowed_path": perm.allowed_path,
                 "can_read": perm.can_read,
                 "can_write": perm.can_write,
                 "can_delete": perm.can_delete,
                 "can_download": perm.can_download
-            }
-            for perm in permission_data.permissions
-        ]
-    )
+            })
 
-    if not success:
+    try:
+        new_permissions = set_user_permissions(
+            db,
+            user_id=user_id,
+            permissions=processed_permissions
+        )
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="设置权限失败"
+            detail=f"设置权限失败: {str(e)}"
         )
 
     log_event(
@@ -421,5 +440,121 @@ async def set_user_permissions(
     return ResponseModel(
         success=True,
         message=f"用户 {user_id} 的权限已成功更新",
-        data={"user_id": user_id, "permissions_count": len(permission_data.permissions)}
+        data={"user_id": user_id, "permissions_count": len(processed_permissions)}
+    )
+
+
+@router.post("/{user_id}/reset-password", response_model=ResponseModel)
+async def reset_password(
+    request: Request,
+    user_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    重置用户密码（管理员专用）。
+
+    Args:
+        request: HTTP 请求对象
+        user_id: 用户 ID
+        current_user: 当前管理员用户对象
+        db: 数据库会话
+
+    Returns:
+        ResponseModel: 重置结果响应
+    """
+    client_ip, user_agent = get_client_info(request)
+
+    user = user_service.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+
+    # 生成默认密码
+    default_password = "12345678"
+    success = user_service.force_change_password(db, user_id, default_password)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="重置密码失败"
+        )
+
+    log_event(
+        db,
+        event_data={
+            "event_type": "user_management",
+            "user_id": current_user.id,
+            "username": current_user.username,
+            "user_role": current_user.role,
+            "operation": "reset_password",
+            "file_path": f"/users/{user_id}/reset-password",
+            "status": "success",
+            "client_ip": client_ip,
+            "user_agent": user_agent
+        }
+    )
+
+    return ResponseModel(
+        success=True,
+        message=f"用户 {user_id} 的密码已重置为默认值",
+        data={"user_id": user_id, "default_password": default_password}
+    )
+
+
+@router.post("/change-password", response_model=ResponseModel)
+async def change_password(
+    request: Request,
+    password_data: ChangePassword,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    修改当前用户密码。
+
+    Args:
+        request: HTTP 请求对象
+        password_data: 包含旧密码和新密码的请求体
+        current_user: 当前用户对象
+        db: 数据库会话
+
+    Returns:
+        ResponseModel: 修改结果响应
+    """
+    client_ip, user_agent = get_client_info(request)
+
+    success = user_service.change_user_password(
+        db,
+        current_user.id,
+        password_data.old_password,
+        password_data.new_password
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="旧密码错误"
+        )
+
+    log_event(
+        db,
+        event_data={
+            "event_type": "user_management",
+            "user_id": current_user.id,
+            "username": current_user.username,
+            "user_role": current_user.role,
+            "operation": "change_password",
+            "file_path": "/users/change-password",
+            "status": "success",
+            "client_ip": client_ip,
+            "user_agent": user_agent
+        }
+    )
+
+    return ResponseModel(
+        success=True,
+        message="密码修改成功",
+        data={"user_id": current_user.id}
     )

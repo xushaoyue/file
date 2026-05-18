@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from backend.app.models.git_webhook import GitWebhookConfig
 from backend.app.models.git_repository import GitRepository
 from backend.app.git_integration.git_service import GitService
-from backend.app.services.audit_service import log_event
+from backend.app.services.audit_service import log_event, get_current_time
 
 logger = logging.getLogger("audit.webhook_handler")
 
@@ -165,7 +165,7 @@ class WebhookHandler:
                 "commit_count": len(parsed_data.get("commits", [])),
                 "pusher": parsed_data.get("pusher")
             },
-            "timestamp": datetime.now(timezone.utc)
+            "timestamp": get_current_time()
         }
 
         try:

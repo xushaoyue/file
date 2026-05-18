@@ -254,7 +254,7 @@ const loadUsers = async () => {
       page: currentPage.value,
       page_size: pageSize.value
     })
-    users.value = response.data.items || response.data.results || response.data
+    users.value = response.data.users || response.data.items || response.data.results || response.data
     total.value = response.data.total || users.value.length
   } catch (error) {
     ElMessage.error('加载用户列表失败')

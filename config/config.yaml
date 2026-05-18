@@ -7,6 +7,7 @@ app:
   cors_origins:
     - "http://localhost:3000"
     - "http://localhost:5173"
+  timezone: "Asia/Shanghai"
 
 database:
   type: "sqlite"
@@ -57,6 +58,18 @@ log:
   format: "json"
   app_log_file: "app.log"
   audit_log_prefix: "audit"
+
+audit:
+  # 日志记录级别: minimal(仅记录关键操作), standard(标准记录), verbose(详细记录)
+  log_level: "standard"
+  # 批量操作阈值，超过此数量的文件操作将合并为一条聚合日志
+  batch_operation_threshold: 10
+  # 是否记录文件列表操作（list）的日志
+  log_list_operations: false
+  # 是否记录文件读取操作（read）的日志
+  log_read_operations: true
+  # 是否启用批量日志合并
+  enable_batch_logging: true
 
 file_access:
   base_path: "D:/PROJECT/SourceCode"
