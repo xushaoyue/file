@@ -1,7 +1,9 @@
+import os
+import shutil
 from typing import Optional
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
@@ -72,6 +74,7 @@ async def list_files(
     items = [
         FileItem(
             name=item["name"],
+            path=item["path"],
             type="directory" if item["is_dir"] else "file",
             size=item.get("size", 0),
             modified_at=item.get("modified")
@@ -398,3 +401,181 @@ async def download_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.post("/directory", response_model=ResponseModel)
+async def create_directory(
+    request: Request,
+    path: str = Query(..., description="父目录路径"),
+    name: str = Query(..., description="目录名称"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    client_ip, user_agent = get_client_info(request)
+    target_path = os.path.join(path, name) if path != "/" else f"/{name}"
+
+    result = file_service.create_directory(path=target_path, user=current_user)
+
+    if "error" in result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["error"]
+        )
+
+    log_event(db, event_data={
+        "event_type": "file_operation",
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "user_role": current_user.role,
+        "operation": "create_directory",
+        "file_path": target_path,
+        "status": "success",
+        "client_ip": client_ip,
+        "user_agent": user_agent
+    })
+
+    return ResponseModel(success=True, message=f"目录创建成功: {name}")
+
+
+@router.post("/upload", response_model=ResponseModel)
+async def upload_file(
+    request: Request,
+    file: UploadFile = File(...),
+    path: str = Form(default="/"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    client_ip, user_agent = get_client_info(request)
+    target_dir = file_service.normalize_path(path)
+
+    if not target_dir.exists() or not target_dir.is_dir():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="目标目录不存在")
+
+    target_path = target_dir / file.filename
+
+    try:
+        content = await file.read()
+        with open(target_path, "wb") as f:
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"上传失败: {str(e)}")
+
+    log_event(db, event_data={
+        "event_type": "file_operation",
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "user_role": current_user.role,
+        "operation": "upload",
+        "file_path": str(target_path),
+        "file_size_after": len(content),
+        "status": "success",
+        "client_ip": client_ip,
+        "user_agent": user_agent
+    })
+
+    return ResponseModel(success=True, message=f"文件上传成功: {file.filename}")
+
+
+@router.put("/rename", response_model=ResponseModel)
+async def rename_file(
+    request: Request,
+    old_path: str = Query(..., description="原文件路径"),
+    new_path: str = Query(..., description="新文件路径"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    client_ip, user_agent = get_client_info(request)
+    src = file_service.normalize_path(old_path)
+    dst = file_service.normalize_path(new_path)
+
+    if not src.exists():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="文件不存在")
+
+    try:
+        os.rename(src, dst)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"重命名失败: {str(e)}")
+
+    log_event(db, event_data={
+        "event_type": "file_operation",
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "user_role": current_user.role,
+        "operation": "rename",
+        "file_path": str(src),
+        "dest_path": str(dst),
+        "status": "success",
+        "client_ip": client_ip,
+        "user_agent": user_agent
+    })
+
+    return ResponseModel(success=True, message="重命名成功")
+
+
+@router.put("/move", response_model=ResponseModel)
+async def move_file(
+    request: Request,
+    source_path: str = Query(..., description="源文件路径"),
+    target_path: str = Query(..., description="目标路径"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    client_ip, user_agent = get_client_info(request)
+    src = file_service.normalize_path(source_path)
+    dst = file_service.normalize_path(target_path)
+
+    if not src.exists():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="源文件不存在")
+
+    try:
+        if dst.is_dir():
+            dst = dst / src.name
+        shutil.move(str(src), str(dst))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"移动失败: {str(e)}")
+
+    log_event(db, event_data={
+        "event_type": "file_operation",
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "user_role": current_user.role,
+        "operation": "move",
+        "file_path": str(src),
+        "dest_path": str(dst),
+        "status": "success",
+        "client_ip": client_ip,
+        "user_agent": user_agent
+    })
+
+    return ResponseModel(success=True, message="移动成功")
+
+
+@router.post("/copy", response_model=ResponseModel)
+async def copy_file_route(
+    request: Request,
+    source_path: str = Query(..., description="源文件路径"),
+    target_path: str = Query(..., description="目标路径"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    client_ip, user_agent = get_client_info(request)
+
+    result = file_service.copy_file(src=source_path, dst=target_path, user=current_user)
+
+    if "error" in result:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
+
+    log_event(db, event_data={
+        "event_type": "file_operation",
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "user_role": current_user.role,
+        "operation": "copy",
+        "file_path": source_path,
+        "dest_path": target_path,
+        "status": "success",
+        "client_ip": client_ip,
+        "user_agent": user_agent
+    })
+
+    return ResponseModel(success=True, message="复制成功")

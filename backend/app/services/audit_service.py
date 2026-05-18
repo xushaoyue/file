@@ -2,16 +2,20 @@ import os
 import csv
 import json
 import io
+import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, func
+from sqlalchemy.exc import OperationalError
 
 from backend.app.models.audit_log import AuditLog
 from backend.app.config import settings
 
+logger = logging.getLogger("audit.audit_service")
 
-def log_event(db: Session, event_data: Dict[str, Any]) -> AuditLog:
+
+def log_event(db: Session, event_data: Dict[str, Any]) -> Optional[AuditLog]:
     """
     记录审计事件到数据库。
 
@@ -35,7 +39,7 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> AuditLog:
             - event_metadata: 额外元数据（可选）
 
     Returns:
-        AuditLog: 创建的审计日志对象
+        Optional[AuditLog]: 创建的审计日志对象，失败返回 None
     """
     log = AuditLog(
         event_type=event_data.get("event_type", "general"),
@@ -53,14 +57,24 @@ def log_event(db: Session, event_data: Dict[str, Any]) -> AuditLog:
         diff_content=event_data.get("diff_content"),
         error_message=event_data.get("error_message"),
         extra_data=event_data.get("extra_data"),
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
 
     db.add(log)
-    db.commit()
-    db.refresh(log)
-
-    return log
+    try:
+        db.flush()
+        db.commit()
+        return log
+    except OperationalError as e:
+        logger.warning("审计日志写入失败 (将尝试回滚重试): %s", str(e))
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        db.add(log)
+        db.flush()
+        db.commit()
+        return log
 
 
 def write_to_file(log: AuditLog) -> bool:
@@ -399,7 +413,7 @@ def cleanup_old_logs(db: Session, days: int = None) -> int:
     if days is None:
         days = settings.log.retention_days
 
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     count = db.query(AuditLog).filter(
         AuditLog.timestamp < cutoff_date
@@ -446,7 +460,7 @@ def get_failed_operations(db: Session,
     Returns:
         List[AuditLog]: 失败的审计日志列表
     """
-    cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     return db.query(AuditLog).filter(
         AuditLog.timestamp >= cutoff_time,

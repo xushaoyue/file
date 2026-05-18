@@ -3,7 +3,7 @@ import time
 import threading
 from typing import Optional, Dict, Any, List, Callable
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
@@ -156,8 +156,9 @@ class AuditEventHandler(FileSystemEventHandler):
             "file_path": event.src_path,
             "dest_path": getattr(event, "dest_path", None),
             "is_directory": event.is_directory,
-            "timestamp": datetime.utcnow(),
-            "status": "success"
+            "timestamp": datetime.now(timezone.utc),
+            "status": "success",
+            "username": "system"
         }
 
     def _flush_events(self):

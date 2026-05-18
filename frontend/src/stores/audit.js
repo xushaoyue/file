@@ -6,8 +6,8 @@ export const useAuditStore = defineStore('audit', () => {
   const logs = ref([])
   const statistics = ref(null)
   const filters = ref({
-    startDate: '',
-    endDate: '',
+    start_date: '',
+    end_date: '',
     username: '',
     operation: '',
     status: ''
@@ -21,14 +21,13 @@ export const useAuditStore = defineStore('audit', () => {
     loading.value = true
     try {
       currentPage.value = page
-      const params = {
-        page,
-        page_size: pageSize.value,
-        ...filters.value
+      const params = { page, page_size: pageSize.value }
+      for (const [key, val] of Object.entries(filters.value)) {
+        if (val !== '') params[key] = val
       }
       const response = await apiFetchLogs(params)
-      logs.value = response.data.items || response.data.results || response.data
-      total.value = response.data.total || logs.value.length
+      logs.value = response.data.logs || []
+      total.value = response.data.total || 0
     } catch (error) {
       console.error('获取审计日志失败:', error)
     } finally {
@@ -47,7 +46,11 @@ export const useAuditStore = defineStore('audit', () => {
 
   async function exportLogs(format = 'csv') {
     try {
-      const response = await apiExportLogs({ ...filters.value, format })
+      const params = { format }
+      for (const [key, val] of Object.entries(filters.value)) {
+        if (val !== '') params[key] = val
+      }
+      const response = await apiExportLogs(params)
       return response.data
     } catch (error) {
       console.error('导出审计日志失败:', error)
@@ -61,8 +64,8 @@ export const useAuditStore = defineStore('audit', () => {
 
   function clearFilters() {
     filters.value = {
-      startDate: '',
-      endDate: '',
+      start_date: '',
+      end_date: '',
       username: '',
       operation: '',
       status: ''
