@@ -1,7 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+from backend.app.utils import get_timezone_offset
 
 
 class AuditLogResponse(BaseModel):
@@ -21,6 +23,12 @@ class AuditLogResponse(BaseModel):
     diff_content: Optional[str] = None
     error_message: Optional[str] = None
     extra_data: Optional[dict] = None
+
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, dt: datetime) -> str:
+        offset = get_timezone_offset(dt)
+        aware_dt = dt.replace(tzinfo=timezone.utc).astimezone(timezone(offset))
+        return aware_dt.isoformat()
 
     class Config:
         from_attributes = True
@@ -50,5 +58,6 @@ class AuditLogList(BaseModel):
 class AuditStats(BaseModel):
     total_operations: int
     operations_by_type: Dict[str, int]
+    daily_trend: List[Dict[str, Any]] = Field(default_factory=list, description="每日操作趋势")
     top_users: List[Dict[str, Any]]
     top_files: List[Dict[str, Any]]

@@ -39,6 +39,7 @@ export const useAuditStore = defineStore('audit', () => {
     try {
       const response = await apiFetchStats()
       statistics.value = response.data
+      return response.data
     } catch (error) {
       console.error('获取统计数据失败:', error)
     }

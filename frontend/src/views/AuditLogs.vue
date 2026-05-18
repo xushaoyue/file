@@ -12,11 +12,11 @@
               <el-form-item label="日期范围">
                 <el-date-picker
                   v-model="filterForm.dateRange"
-                  type="daterange"
+                  type="datetimerange"
                   range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  value-format="YYYY-MM-DD"
+                  start-placeholder="开始时间"
+                  end-placeholder="结束时间"
+                  value-format="YYYY-MM-DD HH:mm:ss"
                   @change="handleFilterChange"
                 />
               </el-form-item>
@@ -36,15 +36,24 @@
                   placeholder="请选择"
                   clearable
                   @change="handleFilterChange"
+                  style="width: 130px"
                 >
                   <el-option label="登录" value="login" />
                   <el-option label="登出" value="logout" />
-                  <el-option label="查看" value="view" />
+                  <el-option label="注册" value="register" />
+                  <el-option label="列表" value="list" />
+                  <el-option label="读取" value="read" />
+                  <el-option label="写入" value="write" />
                   <el-option label="创建" value="create" />
-                  <el-option label="修改" value="update" />
                   <el-option label="删除" value="delete" />
                   <el-option label="下载" value="download" />
                   <el-option label="上传" value="upload" />
+                  <el-option label="移动" value="move" />
+                  <el-option label="复制" value="copy" />
+                  <el-option label="重命名" value="rename" />
+                  <el-option label="修改" value="modify" />
+                  <el-option label="同步" value="sync" />
+                  <el-option label="克隆" value="clone" />
                 </el-select>
               </el-form-item>
               
@@ -54,6 +63,7 @@
                   placeholder="请选择"
                   clearable
                   @change="handleFilterChange"
+                  style="width: 100px"
                 >
                   <el-option label="成功" value="success" />
                   <el-option label="失败" value="failed" />
@@ -177,7 +187,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { useAuditStore } from '@/stores/audit'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import LayoutHeader from '@/components/Layout/Header.vue'
@@ -191,6 +201,11 @@ const loading = ref(false)
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
+
+// Sync pageSize with store
+watch(() => auditStore.pageSize, (newVal) => {
+  pageSize.value = newVal
+}, { immediate: true })
 
 const filterForm = reactive({
   dateRange: [],
@@ -342,6 +357,7 @@ const handlePageChange = (page) => {
 
 const handleSizeChange = (size) => {
   pageSize.value = size
+  auditStore.pageSize = size
   loadLogs()
 }
 
@@ -369,22 +385,44 @@ const getOperationLabel = (operation) => {
   const labels = {
     login: '登录',
     logout: '登出',
+    register: '注册',
+    refresh_token: '刷新令牌',
+    list: '列表',
+    read: '读取',
     view: '查看',
+    write: '写入',
     create: '创建',
-    update: '修改',
+    update: '更新',
+    modify: '修改',
     delete: '删除',
     download: '下载',
-    upload: '上传'
+    upload: '上传',
+    create_directory: '创建目录',
+    rename: '重命名',
+    move: '移动',
+    copy: '复制',
+    clone: '克隆',
+    sync: '同步',
+    pull: '拉取',
+    unknown: '未知',
+    list_keys: '列出密钥',
+    add_key: '添加密钥',
+    delete_key: '删除密钥',
+    list_users: '列出用户',
+    create_user: '创建用户',
+    update_user: '更新用户',
+    delete_user: '删除用户',
+    set_permissions: '设置权限',
+    change_password: '修改密码',
+    reset_password: '重置密码'
   }
   return labels[operation] || operation
 }
 
 const formatTime = (time) => {
   if (!time) return '-'
-  if (typeof time === 'string' && !time.endsWith('Z') && !time.includes('+')) {
-    return new Date(time + 'Z').toLocaleString('zh-CN')
-  }
-  return new Date(time).toLocaleString('zh-CN')
+  const date = new Date(time)
+  return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
 }
 </script>
 

@@ -14,6 +14,7 @@ class AppConfig(BaseModel):
     port: int = 8000
     debug: bool = False
     cors_origins: List[str] = ["http://localhost:3000"]
+    timezone: str = "Asia/Shanghai"
 
 
 class DatabaseConfig(BaseModel):
@@ -68,6 +69,14 @@ class LogConfig(BaseModel):
     audit_log_prefix: str = "audit"
 
 
+class AuditConfig(BaseModel):
+    log_level: str = "standard"  # minimal, standard, verbose
+    batch_operation_threshold: int = 10
+    log_list_operations: bool = False
+    log_read_operations: bool = False
+    enable_batch_logging: bool = True
+
+
 class FileAccessConfig(BaseModel):
     base_path: str = ""
     max_file_size_mb: int = 100
@@ -88,6 +97,7 @@ class Settings(BaseSettings):
     monitor: MonitorConfig = MonitorConfig()
     rate_limit: RateLimitConfig = RateLimitConfig()
     log: LogConfig = LogConfig()
+    audit: AuditConfig = AuditConfig()
     file_access: FileAccessConfig = FileAccessConfig()
     admin: AdminConfig = AdminConfig()
 

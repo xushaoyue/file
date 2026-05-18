@@ -3,94 +3,61 @@
 ## 项目架构
 
 | 组件 | 技术栈                           | 端口   |
-|------|---------------------------------|--------|
-| 前端 | Vue 3 + Vite + Element Plus   | 3000   |
-| 后端 | FastAPI + SQLAlchemy + SQLite | 8000   |
+| -- | ----------------------------- | ---- |
+| 前端 | Vue 3 + Vite + Element Plus   | 3000 |
+| 后端 | FastAPI + SQLAlchemy + SQLite | 8000 |
 
 ***
 
 ## 前置要求
 
-- **Node.js** >= 18.x
+- **Node.js** >= 20.x
 - **Python** >= 3.9
 - **npm** 或 **pnpm**
 
 ***
 
-## 1. 启动后端服务
+## 启动完整流程
 
-```bash
-# 进入后端目录
-cd backend
+### 1. 首次设置（只需要做一次）
 
-# 安装 Python 依赖
-pip install -r requirements.txt
+```
+# 进入项目目录
+cd e:\工作\tools\codeSafe
 
-# 启动后端服务
-cd ..
-export CONFIG_PATH="./config/config.yaml"
-python -m backend.app.main
+# 创建虚拟环境（首次）
+python -m venv venv
+
+# 激活虚拟环境
+venv\Scripts\activate
+
+# 在激活的虚拟环境中安装依赖
+pip install -r backend/requirements.txt
 ```
 
-后端启动成功后会：
+### 2. 每次启动项目（每次都需要）
 
-- 自动初始化 SQLite 数据库 (`./data/audit.db`)
-- 创建默认管理员账户
+```PowerShell
+# 进入项目目录
+cd e:\工作\tools\codeSafe
 
-***
+# 激活虚拟环境（关键步骤）
+venv\Scripts\activate
 
-## 2. 启动前端服务
-
-```bash
-# 新开一个终端，进入前端目录
-cd frontend
-
-# 安装前端依赖
-npm install
-
-# 启动开发服务器
-npm run dev
+# 设置环境变量并启动程序
+.\start_all.ps1
 ```
 
-前端开发服务器地址：`http://localhost:3000`
+### 3. 退出虚拟环境（可选）
 
-***
-
-## 3. 登录系统
-
-- **默认管理员账号**: `admin`
-- **默认密码**: `Admin@123456`
-- **首次登录后需要修改密码**
-
-***
-
-## 配置文件说明
-
-主配置文件位于 `config/config.yaml`：
-
-```yaml
-app:
-  port: 8000          # 后端端口
-database:
-  path: "./data/audit.db"   # 数据库路径
-admin:
-  default_username: "admin"
-  default_password: "Admin@123456"
-monitor:
-  enabled: true
-  watch_paths:        # 监控的代码目录
-    - "/source"
-    - "./source"
+```
+deactivate
 ```
 
-***
+## 注意事项
 
-## 常用命令
+1. 激活虚拟环境后 ，命令行提示符会显示 (venv) 前缀，表示已进入虚拟环境
+2. 每次打开新终端启动程序时 ，都需要重新激活虚拟环境
+3. 如果忘记激活虚拟环境直接运行程序，可能会找不到依赖包
 
-```bash
-# 前端构建生产版本
-npm run build
-
-# 前端预览生产版本
-npm run preview
-```
+下次启动时只需双击这个脚本即可。

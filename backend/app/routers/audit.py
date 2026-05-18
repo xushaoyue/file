@@ -16,6 +16,15 @@ from backend.app.schemas.audit import (
 from backend.app.schemas.common import ResponseModel
 from backend.app.services import audit_service
 from backend.app.models.user import User
+from backend.app.utils import get_timezone_offset
+
+
+def _local_to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """将前端传来的本地时间（naive）转为 UTC（naive）用于数据库查询"""
+    if dt is None:
+        return None
+    offset = get_timezone_offset(dt)
+    return dt - offset
 
 router = APIRouter(prefix="/api/v1/audit", tags=["审计日志"])
 
@@ -62,9 +71,9 @@ async def query_audit_logs(
     filters = {}
 
     if start_date:
-        filters["start_date"] = start_date
+        filters["start_date"] = _local_to_utc(start_date)
     if end_date:
-        filters["end_date"] = end_date
+        filters["end_date"] = _local_to_utc(end_date)
     if user_id:
         filters["user_id"] = user_id
     if username:
@@ -203,9 +212,9 @@ async def export_audit_logs(
     filters = {}
 
     if start_date:
-        filters["start_date"] = start_date
+        filters["start_date"] = _local_to_utc(start_date)
     if end_date:
-        filters["end_date"] = end_date
+        filters["end_date"] = _local_to_utc(end_date)
     if user_id:
         filters["user_id"] = user_id
     if username:
@@ -261,27 +270,31 @@ async def get_audit_statistics(
     """
     total_result = audit_service.get_statistics(
         db,
-        start_date=start_date,
-        end_date=end_date,
+        start_date=_local_to_utc(start_date),
+        end_date=_local_to_utc(end_date),
         group_by="day"
     )
 
+    daily_trend_data = total_result.get("statistics", [])
+    total_operations = sum(item.get("count", 0) for item in daily_trend_data)
+
     operation_result = audit_service.get_statistics(
         db,
-        start_date=start_date,
-        end_date=end_date,
+        start_date=_local_to_utc(start_date),
+        end_date=_local_to_utc(end_date),
         group_by="operation"
     )
 
     user_result = audit_service.get_statistics(
         db,
-        start_date=start_date,
-        end_date=end_date,
+        start_date=_local_to_utc(start_date),
+        end_date=_local_to_utc(end_date),
         group_by="user"
     )
 
     return AuditStats(
-        total_operations=total_result.get("total", 0),
+        total_operations=total_operations,
+        daily_trend=daily_trend_data,
         operations_by_type={
             item["operation"]: item["count"]
             for item in operation_result.get("statistics", [])

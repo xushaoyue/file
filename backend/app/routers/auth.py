@@ -60,7 +60,7 @@ async def login(
     """
     client_ip, user_agent = get_client_info(request)
 
-    user = authenticate_user(db, form_data.username, form_data.password)
+    user, error_message = authenticate_user(db, form_data.username, form_data.password)
 
     if not user:
         log_event(
@@ -73,12 +73,12 @@ async def login(
                 "status": "failure",
                 "client_ip": client_ip,
                 "user_agent": user_agent,
-                "error_message": "用户名或密码错误"
+                "error_message": error_message or "用户名或密码错误"
             }
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
+            detail=error_message or "用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

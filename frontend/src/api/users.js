@@ -1,7 +1,7 @@
 import api from './index'
 
 export const fetchUsers = (params) => {
-  return api.get('/users/', { params })
+  return api.get('/users', { params })
 }
 
 export const fetchUserById = (id) => {
@@ -9,7 +9,7 @@ export const fetchUserById = (id) => {
 }
 
 export const createUser = (data) => {
-  return api.post('/users/', data)
+  return api.post('/users', data)
 }
 
 export const updateUser = (id, data) => {
@@ -30,4 +30,8 @@ export const updatePermissions = (id, permissions) => {
 
 export const fetchRoles = () => {
   return api.get('/users/roles')
+}
+
+export const changePassword = (data) => {
+  return api.post('/users/change-password', data)
 }

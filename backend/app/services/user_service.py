@@ -9,8 +9,8 @@ from backend.app.config import settings
 
 
 def create_user(db: Session, username: str, password: str,
-                email: Optional[str] = None, role: str = "user",
-                **extra_fields) -> User:
+                email: Optional[str] = None, full_name: Optional[str] = None,
+                role: str = "user", **extra_fields) -> User:
     """
     创建新用户。
 
@@ -19,6 +19,7 @@ def create_user(db: Session, username: str, password: str,
         username: 用户名（唯一）
         password: 明文密码，将自动哈希
         email: 邮箱地址（可选，唯一）
+        full_name: 用户全名（可选）
         role: 用户角色，默认为 "user"
         **extra_fields: 其他可选字段
 
@@ -41,6 +42,7 @@ def create_user(db: Session, username: str, password: str,
         username=username,
         password_hash=get_password_hash(password),
         email=email,
+        full_name=full_name,
         role=role,
         is_active=True,
         must_change_password=settings.admin.must_change_password if role == "admin" else False,
@@ -170,7 +172,7 @@ def update_user(db: Session, user_id: int,
     for key, value in data.items():
         if key == "password":
             update_fields["password_hash"] = get_password_hash(value)
-        elif key in ["username", "email", "role", "is_active",
+        elif key in ["username", "email", "full_name", "role", "is_active",
                      "must_change_password", "last_login"]:
             update_fields[key] = value
 
@@ -178,7 +180,7 @@ def update_user(db: Session, user_id: int,
         for key, value in update_fields.items():
             setattr(user, key, value)
 
-        user.updated_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         db.refresh(user)
 
@@ -218,7 +220,7 @@ def check_login_attempts(user: User) -> bool:
     if user.locked_until is None:
         return True
 
-    if datetime.now(timezone.utc) > user.locked_until:
+    if datetime.now(timezone.utc).replace(tzinfo=None) > user.locked_until:
         return True
 
     return False
@@ -238,7 +240,7 @@ def increment_failed_attempts(db: Session, user: User) -> User:
     user.failed_attempts += 1
 
     if user.failed_attempts >= settings.security.max_login_attempts:
-        user.locked_until = datetime.now(timezone.utc) + timedelta(
+        user.locked_until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             minutes=settings.security.lockout_duration_minutes
         )
 
@@ -267,7 +269,7 @@ def reset_failed_attempts(db: Session, user: User) -> User:
     return user
 
 
-def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
+def authenticate_user(db: Session, username: str, password: str) -> tuple[Optional[User], Optional[str]]:
     """
     验证用户凭据。
 
@@ -277,27 +279,39 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
         password: 明文密码
 
     Returns:
-        Optional[User]: 验证成功返回用户对象，失败返回 None
+        tuple[Optional[User], Optional[str]]: (用户对象, 错误信息)
+        - 验证成功返回 (user, None)
+        - 验证失败返回 (None, 错误信息)
     """
     user = get_user_by_username(db, username)
 
     if not user:
-        return None
+        return None, "用户名或密码错误"
 
     if not user.is_active:
-        return None
+        return None, "用户已被停用，请联系管理员"
 
     if not check_login_attempts(user):
-        return None
+        # 计算剩余锁定时间
+        remaining = user.locked_until - datetime.now(timezone.utc).replace(tzinfo=None)
+        remaining_minutes = max(1, int(remaining.total_seconds() / 60))
+        return None, f"账号已被锁定，请 {remaining_minutes} 分钟后重试"
 
     if verify_password(password, user.password_hash):
         reset_failed_attempts(db, user)
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
-        return user
+        return user, None
 
     increment_failed_attempts(db, user)
-    return None
+    
+    # 检查是否因为这次失败尝试导致锁定
+    if not check_login_attempts(user):
+        remaining = user.locked_until - datetime.now(timezone.utc).replace(tzinfo=None)
+        remaining_minutes = max(1, int(remaining.total_seconds() / 60))
+        return None, f"密码错误次数过多，账号已被锁定，请 {remaining_minutes} 分钟后重试"
+    
+    return None, "用户名或密码错误"
 
 
 def change_user_password(db: Session, user_id: int, old_password: str,
@@ -323,7 +337,7 @@ def change_user_password(db: Session, user_id: int, old_password: str,
 
     user.password_hash = get_password_hash(new_password)
     user.must_change_password = False
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
     return True
@@ -346,7 +360,7 @@ def force_change_password(db: Session, user_id: int, new_password: str) -> bool:
         return False
 
     user.password_hash = get_password_hash(new_password)
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
     return True
