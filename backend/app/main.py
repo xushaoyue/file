@@ -166,12 +166,13 @@ async def health_check():
 
 
 try:
-    from backend.app.routers import auth, files, audit, users, ssh_keys
+    from backend.app.routers import auth, files, audit, users, ssh_keys, git
     app.include_router(auth.router, prefix="", tags=["认证"])
     app.include_router(files.router, prefix="", tags=["文件"])
     app.include_router(audit.router, prefix="", tags=["审计"])
     app.include_router(users.router, prefix="", tags=["用户"])
     app.include_router(ssh_keys.router, prefix="", tags=["密钥"])
+    app.include_router(git.router, prefix="", tags=["Git"])
     logger.info("所有路由模块导入成功")
 except ImportError as e:
     logger.error("路由模块导入失败: %s", str(e), exc_info=True)

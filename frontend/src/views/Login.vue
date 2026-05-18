@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { User, Lock } from '@element-plus/icons-vue'
@@ -105,10 +105,10 @@ const handleLogin = async () => {
         
         if (result.success) {
           ElMessage.success('登录成功')
-          // 使用 nextTick 确保状态更新后再跳转
-          setTimeout(() => {
-            router.push('/')
-          }, 100)
+          console.log('登录成功，准备跳转...')
+          console.log('localStorage token:', localStorage.getItem('token') ? '存在' : '不存在')
+          console.log('authStore.isAuthenticated:', authStore.isAuthenticated)
+          router.replace('/')
         } else {
           errorMessage.value = result.message
         }

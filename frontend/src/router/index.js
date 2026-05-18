@@ -37,6 +37,18 @@ const routes = [
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/git/repositories',
+    name: 'GitRepositories',
+    component: () => import('@/views/GitRepositories.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/git/commits/:repoId',
+    name: 'GitCommits',
+    component: () => import('@/views/GitCommits.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
@@ -47,10 +59,13 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+  const token = localStorage.getItem('token')
   
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+  const isAuthenticated = authStore.isAuthenticated || !!token
+  
+  if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
+  } else if (to.path === '/login' && isAuthenticated) {
     next('/')
   } else if (to.meta.requiresAdmin && authStore.user?.role !== 'admin') {
     next('/')

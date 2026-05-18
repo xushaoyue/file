@@ -25,6 +25,11 @@
         <template #title>审计日志</template>
       </el-menu-item>
       
+      <el-menu-item index="/git/repositories">
+        <el-icon><Connection /></el-icon>
+        <template #title>Git 仓库</template>
+      </el-menu-item>
+      
       <el-sub-menu v-if="isAdmin" index="system">
         <template #title>
           <el-icon><Setting /></el-icon>
@@ -49,7 +54,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { HomeFilled, Folder, List, Setting, User, Tools } from '@element-plus/icons-vue'
+import { HomeFilled, Folder, List, Setting, User, Tools, Connection } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

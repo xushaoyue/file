@@ -10,10 +10,10 @@ const api = axios.create({
 
 api.interceptors.request.use(
   config => {
-    const authStore = useAuthStore()
-    console.log('请求拦截器 - token:', authStore.token)
-    if (authStore.token) {
-      config.headers.Authorization = `Bearer ${authStore.token}`
+    const token = localStorage.getItem('token')
+    console.log('请求拦截器 - token:', token)
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
       console.log('添加 Authorization header:', config.headers.Authorization)
     }
     console.log('请求配置:', config)
