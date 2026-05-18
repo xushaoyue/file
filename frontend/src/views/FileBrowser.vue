@@ -1,8 +1,8 @@
 <template>
-  <el-container class="layout-container">
-    <LayoutSidebar />
-    <el-container>
-      <LayoutHeader />
+  <el-container class="layout-container" direction="vertical">
+    <LayoutHeader />
+    <el-container class="layout-body">
+      <LayoutSidebar />
       <el-main class="main-content">
         <div class="file-browser">
           <div class="toolbar">
@@ -55,9 +55,8 @@
                 <el-breadcrumb-item
                   v-for="item in breadcrumb"
                   :key="item.path"
-                  :to="item.path"
                 >
-                  {{ item.name }}
+                  <span class="breadcrumb-link" @click="loadFiles(item.path)">{{ item.name }}</span>
                 </el-breadcrumb-item>
               </el-breadcrumb>
               
@@ -88,9 +87,10 @@
                     {{ formatTime(row.modified_at) }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="150">
+                <el-table-column label="操作" width="280">
                   <template #default="{ row }">
                     <el-button type="primary" link @click="handleView(row)">查看</el-button>
+                    <el-button type="primary" link @click="handleDownload(row)" :disabled="row.is_directory">下载</el-button>
                     <el-button type="primary" link @click="handleRename(row)">重命名</el-button>
                     <el-button type="danger" link @click="handleDeleteFile(row)">删除</el-button>
                   </template>
@@ -122,6 +122,7 @@
             drag
             :action="uploadUrl"
             :headers="{ Authorization: `Bearer ${token}` }"
+            :data="{ path: currentPath }"
             :auto-upload="false"
             :on-success="handleUploadSuccess"
             :on-error="handleUploadError"
@@ -165,7 +166,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import * as filesApi from '@/api/files'
@@ -178,7 +179,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const token = computed(() => authStore.token)
 
-const uploadUrl = '/api/files/upload'
+const uploadUrl = '/api/v1/files/upload'
 
 const tableRef = ref(null)
 const uploadRef = ref(null)
@@ -210,10 +211,21 @@ onMounted(() => {
   loadRootDirectory()
 })
 
+const mapFileItem = (item) => ({
+  name: item.name,
+  path: item.path,
+  is_directory: item.type === 'directory',
+  size: item.size,
+  modified_at: item.modified_at
+})
+
 const loadRootDirectory = async () => {
   try {
     const response = await filesApi.fetchDirectoryTree('/')
-    directoryTree.value = response.data || []
+    const data = response.data
+    if (data && data.items) {
+      directoryTree.value = data.items.filter(i => i.type === 'directory').map(mapFileItem)
+    }
     await loadFiles('/')
   } catch (error) {
     ElMessage.error('加载目录失败')
@@ -223,7 +235,8 @@ const loadRootDirectory = async () => {
 const loadFiles = async (path) => {
   try {
     const response = await filesApi.fetchFiles({ path })
-    files.value = response.data || []
+    const data = response.data
+    files.value = data && data.items ? data.items.map(mapFileItem) : []
     currentPath.value = path
     updateBreadcrumb(path)
   } catch (error) {
@@ -233,10 +246,13 @@ const loadFiles = async (path) => {
 
 const loadTreeNode = async (node, resolve) => {
   if (node.level === 0) return resolve([])
-  
+
   try {
     const response = await filesApi.fetchDirectoryTree(node.data.path)
-    resolve(response.data || [])
+    const data = response.data
+    const items = data && data.items ? data.items : []
+    const dirs = items.filter(i => i.type === 'directory').map(mapFileItem)
+    resolve(dirs)
   } catch (error) {
     resolve([])
   }
@@ -344,6 +360,21 @@ const handleRenameConfirm = async () => {
   }
 }
 
+const handleDownload = async (row) => {
+  try {
+    const response = await filesApi.downloadFile(row.path)
+    const blob = new Blob([response.data])
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = row.name
+    link.click()
+    URL.revokeObjectURL(link.href)
+    ElMessage.success('下载成功')
+  } catch (error) {
+    ElMessage.error('下载失败')
+  }
+}
+
 const handleDeleteFile = async (row) => {
   try {
     await ElMessageBox.confirm('确定要删除此文件吗？', '提示', {
@@ -418,6 +449,11 @@ const formatTime = (time) => {
   height: 100vh;
 }
 
+.layout-body {
+  flex: 1;
+  overflow: hidden;
+}
+
 .main-content {
   background: #f0f2f5;
   padding: 20px;
@@ -476,5 +512,14 @@ const formatTime = (time) => {
   align-items: center;
   justify-content: center;
   min-height: 400px;
+}
+
+.breadcrumb-link {
+  cursor: pointer;
+  color: #409eff;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
 }
 </style>

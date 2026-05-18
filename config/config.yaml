@@ -28,7 +28,7 @@ monitor:
   enabled: true
   watch_paths:
     - "/source"
-    - "D:/Projects/SourceCode"
+    - "D:/Project/SourceCode"
   exclude_paths:
     - "*/.git/*"
     - "*/node_modules/*"
@@ -59,6 +59,7 @@ log:
   audit_log_prefix: "audit"
 
 file_access:
+  base_path: "D:/PROJECT/SourceCode"
   max_file_size_mb: 100
   allowed_encodings:
     - "utf-8"

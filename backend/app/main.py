@@ -1,3 +1,4 @@
+import time
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -10,17 +11,18 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import settings
 from backend.app.database import init_db, SessionLocal
-from backend.app.middleware.logging import LoggingMiddleware
+from backend.app.middleware.logging import get_client_ip
 from backend.app.middleware.rate_limit import RateLimiter
 from backend.app.services.user_service import get_user_by_username, create_user
 from backend.app.services.monitor_service import start_monitoring, stop_monitoring, get_monitor_service
 from backend.app.services.auth_service import get_password_hash
 
+logger = logging.getLogger("audit.main")
+
 logging.basicConfig(
     level=getattr(logging, settings.log.level.upper()),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("audit.main")
 
 
 @asynccontextmanager
@@ -81,8 +83,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(LoggingMiddleware)
 app.add_middleware(RateLimiter)
+
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    start_time = time.time()
+    client_ip = get_client_ip(request)
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    logger.info(
+        "请求开始 | method=%s | path=%s | client_ip=%s | user_agent=%s",
+        request.method,
+        request.url.path,
+        client_ip,
+        user_agent
+    )
+
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(
+            "请求异常 | method=%s | path=%s | client_ip=%s | duration=%.3fs | error=%s",
+            request.method,
+            request.url.path,
+            client_ip,
+            duration,
+            str(e)
+        )
+        raise
+
+    duration = time.time() - start_time
+    logger.info(
+        "请求完成 | method=%s | path=%s | client_ip=%s | status=%d | duration=%.3fs",
+        request.method,
+        request.url.path,
+        client_ip,
+        response.status_code,
+        duration
+    )
+
+    return response
 
 
 @app.exception_handler(RequestValidationError)

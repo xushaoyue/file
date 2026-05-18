@@ -8,6 +8,7 @@ from .user import PermissionItem
 
 class FileItem(BaseModel):
     name: str
+    path: str
     type: str = Field(..., pattern="^(file|directory)$")
     size: int = 0
     modified_at: Optional[datetime] = None

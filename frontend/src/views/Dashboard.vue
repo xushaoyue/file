@@ -1,8 +1,8 @@
 <template>
-  <el-container class="layout-container">
-    <LayoutSidebar />
-    <el-container>
-      <LayoutHeader />
+  <el-container class="layout-container" direction="vertical">
+    <LayoutHeader />
+    <el-container class="layout-body">
+      <LayoutSidebar />
       <el-main class="main-content">
         <div class="dashboard">
           <h1 class="page-title">仪表盘</h1>
@@ -201,6 +201,11 @@ const formatTime = (time) => {
 <style scoped>
 .layout-container {
   height: 100vh;
+}
+
+.layout-body {
+  flex: 1;
+  overflow: hidden;
 }
 
 .main-content {

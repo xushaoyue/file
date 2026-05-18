@@ -69,6 +69,7 @@ class LogConfig(BaseModel):
 
 
 class FileAccessConfig(BaseModel):
+    base_path: str = ""
     max_file_size_mb: int = 100
     allowed_encodings: List[str] = ["utf-8", "gbk", "gb2312"]
     preview_lines: int = 1000

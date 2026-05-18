@@ -1,8 +1,8 @@
 <template>
-  <el-container class="layout-container">
-    <LayoutSidebar />
-    <el-container>
-      <LayoutHeader />
+  <el-container class="layout-container" direction="vertical">
+    <LayoutHeader />
+    <el-container class="layout-body">
+      <LayoutSidebar />
       <el-main class="main-content">
         <div class="audit-logs">
           <h1 class="page-title">审计日志</h1>
@@ -111,8 +111,8 @@
                   <el-tag>{{ getOperationLabel(row.operation) }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="resource" label="资源" min-width="200" />
-              <el-table-column prop="ip_address" label="IP地址" width="140" />
+              <el-table-column prop="file_path" label="资源" min-width="200" />
+              <el-table-column prop="client_ip" label="IP地址" width="140" />
               <el-table-column prop="status" label="状态" width="100">
                 <template #default="{ row }">
                   <el-tag :type="row.status === 'success' ? 'success' : 'danger'">
@@ -120,10 +120,14 @@
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="message" label="详情" min-width="200" show-overflow-tooltip />
-              <el-table-column prop="created_at" label="时间" width="180">
+              <el-table-column label="详情" min-width="200" show-overflow-tooltip>
                 <template #default="{ row }">
-                  {{ formatTime(row.created_at) }}
+                  {{ row.error_message || row.diff_content || '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="timestamp" label="时间" width="180">
+                <template #default="{ row }">
+                  {{ formatTime(row.timestamp) }}
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="100" fixed="right">
@@ -155,16 +159,16 @@
             <el-descriptions-item label="操作">
               <el-tag>{{ getOperationLabel(currentLog.operation) }}</el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="资源" :span="2">{{ currentLog.resource }}</el-descriptions-item>
-            <el-descriptions-item label="IP地址">{{ currentLog.ip_address }}</el-descriptions-item>
+            <el-descriptions-item label="资源" :span="2">{{ currentLog.file_path }}</el-descriptions-item>
+            <el-descriptions-item label="IP地址">{{ currentLog.client_ip }}</el-descriptions-item>
             <el-descriptions-item label="状态">
               <el-tag :type="currentLog.status === 'success' ? 'success' : 'danger'">
                 {{ currentLog.status === 'success' ? '成功' : '失败' }}
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="User-Agent" :span="2">{{ currentLog.user_agent }}</el-descriptions-item>
-            <el-descriptions-item label="详情" :span="2">{{ currentLog.message }}</el-descriptions-item>
-            <el-descriptions-item label="时间" :span="2">{{ formatTime(currentLog.created_at) }}</el-descriptions-item>
+            <el-descriptions-item label="详情" :span="2">{{ currentLog.error_message || currentLog.diff_content || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="时间" :span="2">{{ formatTime(currentLog.timestamp) }}</el-descriptions-item>
           </el-descriptions>
         </el-dialog>
       </el-main>
@@ -313,8 +317,8 @@ const handleFilterChange = () => {
 const handleSearch = () => {
   currentPage.value = 1
   auditStore.setFilters({
-    startDate: filterForm.dateRange?.[0] || '',
-    endDate: filterForm.dateRange?.[1] || '',
+    start_date: filterForm.dateRange?.[0] || '',
+    end_date: filterForm.dateRange?.[1] || '',
     username: filterForm.username,
     operation: filterForm.operation,
     status: filterForm.status
@@ -377,6 +381,9 @@ const getOperationLabel = (operation) => {
 
 const formatTime = (time) => {
   if (!time) return '-'
+  if (typeof time === 'string' && !time.endsWith('Z') && !time.includes('+')) {
+    return new Date(time + 'Z').toLocaleString('zh-CN')
+  }
   return new Date(time).toLocaleString('zh-CN')
 }
 </script>
@@ -384,6 +391,11 @@ const formatTime = (time) => {
 <style scoped>
 .layout-container {
   height: 100vh;
+}
+
+.layout-body {
+  flex: 1;
+  overflow: hidden;
 }
 
 .main-content {

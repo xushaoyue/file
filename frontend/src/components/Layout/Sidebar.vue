@@ -75,7 +75,7 @@ const handleSelect = (index) => {
 <style scoped>
 .sidebar {
   background: #304156;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 

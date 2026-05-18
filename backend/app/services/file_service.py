@@ -26,8 +26,20 @@ def normalize_path(path: Union[str, Path],
     Raises:
         ValueError: 如果路径无效或试图遍历基础路径
     """
+    if base_path is None:
+        base_path = _get_base_path()
+
     if isinstance(path, str):
         path = Path(path)
+
+    path_str = str(path)
+    # Windows: Path("/") 或 Path("/xxx") 会解析为盘符根目录（如 D:\）
+    # 映射为基础目录或基础目录下的相对路径
+    if path_str in ("/", "\\"):
+        path = Path(str(base_path))
+    elif os.name == 'nt' and len(path_str) > 1 and path_str[0] in ('/', '\\'):
+        rel_part = path_str.lstrip('/\\')
+        path = Path(str(base_path)) / rel_part if rel_part else Path(str(base_path))
 
     abs_path = path.expanduser().resolve()
 
@@ -49,13 +61,10 @@ def normalize_path(path: Union[str, Path],
 
 
 def _get_base_path() -> Path:
-    """
-    获取文件访问的基础路径。
-
-    Returns:
-        Path: 基础路径
-    """
-    return Path("/workspace")
+    base = settings.file_access.base_path
+    if base:
+        return Path(base).expanduser().resolve()
+    return Path.cwd()
 
 
 def check_file_permission(user: User, path: Union[str, Path],
@@ -96,6 +105,7 @@ def list_files(path: Union[str, Path],
         Dict[str, Any]: 包含 files 列表、总数、分页信息的结果字典
     """
     abs_path = normalize_path(path)
+    base = _get_base_path()
 
     if not abs_path.exists():
         return {"error": "路径不存在", "files": [], "total": 0}
@@ -111,10 +121,10 @@ def list_files(path: Union[str, Path],
         for root, dirs, files in os.walk(abs_path):
             for name in files + dirs:
                 item_path = Path(root) / name
-                all_items.append(_get_file_info(item_path))
+                all_items.append(_get_file_info(item_path, base))
     else:
         for item in abs_path.iterdir():
-            all_items.append(_get_file_info(item))
+            all_items.append(_get_file_info(item, base))
 
     total = len(all_items)
     start = (page - 1) * page_size
@@ -130,20 +140,27 @@ def list_files(path: Union[str, Path],
     }
 
 
-def _get_file_info(path: Path) -> Dict[str, Any]:
+def _get_file_info(path: Path, base_path: Optional[Path] = None) -> Dict[str, Any]:
     """
     获取文件或目录的信息。
 
     Args:
         path: 文件路径
+        base_path: 基础路径，如果提供则返回相对于基础路径的路径
 
     Returns:
         Dict[str, Any]: 文件信息字典
     """
     stat = path.stat()
+    display_path = str(path)
+    if base_path:
+        try:
+            display_path = "/" + path.relative_to(base_path).as_posix()
+        except ValueError:
+            pass
     return {
         "name": path.name,
-        "path": str(path),
+        "path": display_path,
         "is_dir": path.is_dir(),
         "size": stat.st_size,
         "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),

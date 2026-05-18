@@ -55,6 +55,11 @@ def _path_matches(file_path: str, allowed_path: str) -> bool:
         bool: 是否匹配
     """
     import re
+    from pathlib import Path
+
+    file_path = Path(file_path).as_posix()
+    allowed_path = Path(allowed_path).as_posix()
+    file_path = re.sub(r'^[A-Za-z]:', '', file_path)
 
     if allowed_path.endswith("*"):
         pattern = "^" + re.escape(allowed_path.rstrip("*"))
