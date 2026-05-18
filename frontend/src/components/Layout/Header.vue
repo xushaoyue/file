@@ -60,11 +60,14 @@ const routeTitles = {
   '/files': '文件浏览',
   '/audit': '审计日志',
   '/users': '用户管理',
-  '/settings': '系统设置'
+  '/settings': '系统设置',
+  '/git/repositories': 'Git 仓库'
 }
 
 const getRouteTitle = (path) => {
-  return routeTitles[path] || ''
+  if (routeTitles[path]) return routeTitles[path]
+  if (path.startsWith('/git/commits/')) return '提交历史'
+  return ''
 }
 
 const handleCommand = async (command) => {
