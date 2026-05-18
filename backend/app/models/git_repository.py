@@ -1,3 +1,10 @@
+"""
+Git 仓库数据模型模块
+
+本模块定义了 Git 仓库的数据模型，用于管理系统中的 Git 代码仓库，
+支持远程仓库同步、分支管理、认证配置等功能。
+"""
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -5,6 +12,29 @@ from backend.app.database import Base
 
 
 class GitRepository(Base):
+    """
+    Git 仓库数据模型
+    
+    表示系统管理的一个 Git 代码仓库，包含仓库的基本信息、
+    远程地址、本地路径、认证配置和同步状态。
+    
+    属性:
+        id: 仓库唯一标识符（主键）
+        name: 仓库名称（唯一）
+        remote_url: Git 远程仓库 URL（HTTPS 或 SSH）
+        local_path: 仓库在本地文件系统中的路径（唯一）
+        branch: 默认跟踪的分支名称
+        auth_type: 认证类型（"none", "password", "ssh_key", "token"）
+        auth_credential: 认证凭据（加密存储）
+        status: 仓库状态（"cloned", "syncing", "synced", "error"）
+        last_synced_at: 最后一次同步时间
+        created_at: 仓库添加时间
+        updated_at: 仓库信息最后更新时间
+    
+    关系:
+        commits: 该仓库的提交记录列表
+        webhook_config: 关联的 Webhook 配置（一对一关系）
+    """
     __tablename__ = "git_repositories"
 
     id = Column(Integer, primary_key=True, index=True)
